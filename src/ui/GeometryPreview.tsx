@@ -29,7 +29,7 @@ export function GeometryPreview(props: {
 
     const maxDimension = Math.max(10, props.maxDimension);
     const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 1200);
-    camera.position.set(maxDimension * 0.6, -maxDimension * 1.25, maxDimension * 0.85);
+    camera.position.set(maxDimension * 0.6, -maxDimension * 1.25, -maxDimension * 0.85);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -37,7 +37,7 @@ export function GeometryPreview(props: {
     host.replaceChildren(renderer.domElement);
 
     const keyLight = new THREE.DirectionalLight("#ffffff", 2.2);
-    keyLight.position.set(maxDimension * 0.6, -maxDimension, maxDimension);
+    keyLight.position.set(maxDimension * 0.6, -maxDimension, -maxDimension);
     scene.add(keyLight);
     scene.add(new THREE.AmbientLight("#ffffff", 1.15));
 

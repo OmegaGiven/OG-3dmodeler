@@ -414,21 +414,6 @@ function createFrontEdgeBevelRing(
     }
   }
 
-  // Back frame at z=wt: annular face closing the outer strip against the back of the plate
-  const lastZ = outerRings[outerRings.length - 1].z;
-  const vO: Array<[number,number,number]> = [
-    [-tw/2,  th/2, lastZ], [ tw/2,  th/2, lastZ],
-    [ tw/2, -th/2, lastZ], [-tw/2, -th/2, lastZ],
-  ];
-  const vI: Array<[number,number,number]> = [
-    [-iw/2,  ih/2, lastZ], [ iw/2,  ih/2, lastZ],
-    [ iw/2, -ih/2, lastZ], [-iw/2, -ih/2, lastZ],
-  ];
-  for (let i = 0; i < 4; i++) {
-    const j = (i + 1) % 4;
-    quad(vO[i], vO[j], vI[j], vI[i], true);
-  }
-
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geo.computeVertexNormals();
