@@ -75,11 +75,7 @@ export function GeometryPreview(props: {
       const deltaX = event.clientX - current.x;
       const deltaY = event.clientY - current.y;
       model.rotation.z = current.rotationZ + deltaX * 0.012;
-      model.rotation.x = THREE.MathUtils.clamp(
-        current.rotationX + deltaY * 0.012,
-        THREE.MathUtils.degToRad(-72),
-        THREE.MathUtils.degToRad(72),
-      );
+      model.rotation.x = current.rotationX + deltaY * 0.012;
     };
 
     const stopDrag = (event: PointerEvent) => {
