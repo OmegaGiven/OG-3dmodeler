@@ -278,20 +278,25 @@ function createWallRingGeo(
   const bs = bevelType !== "none" ? Math.min(bevelSize, depth * 0.9, wt * 0.9) : 0;
 
   // Build sequence of outer-rect cross-sections at increasing Z; inner rect stays iw×ih throughout.
+  // Bevel is at the FRONT (z=wt, where walls meet the face plate) — visible from the front of the cover.
   // At each corner, both adjacent bevel slopes taper simultaneously → clean mitered corners, no seams.
-  const rings: Array<{ z: number; ow: number; oh: number }> = [{ z: wt, ow: tw, oh: th }];
+  const rings: Array<{ z: number; ow: number; oh: number }> = [];
 
   if (bevelType === "chamfer" && bs > 0) {
-    rings.push({ z: wt + depth - bs, ow: tw, oh: th });
-    rings.push({ z: wt + depth, ow: tw - 2 * bs, oh: th - 2 * bs });
+    rings.push({ z: wt, ow: tw - 2 * bs, oh: th - 2 * bs }); // front, inset
+    rings.push({ z: wt + bs, ow: tw, oh: th });                // full size after chamfer
+    rings.push({ z: wt + depth, ow: tw, oh: th });             // back, square
   } else if (bevelType === "fillet" && bs > 0) {
     const segs = 12;
     for (let i = 0; i <= segs; i++) {
       const angle = (i / segs) * (Math.PI / 2);
-      const shrink = bs * (1 - Math.cos(angle));
-      rings.push({ z: wt + depth - bs + bs * Math.sin(angle), ow: tw - 2 * shrink, oh: th - 2 * shrink });
+      // θ=0 at z=wt (front, fully inset), θ=π/2 at z=wt+bs (full size)
+      const shrink = bs * (1 - Math.sin(angle));
+      rings.push({ z: wt + bs * (1 - Math.cos(angle)), ow: tw - 2 * shrink, oh: th - 2 * shrink });
     }
+    rings.push({ z: wt + depth, ow: tw, oh: th }); // back, square
   } else {
+    rings.push({ z: wt, ow: tw, oh: th });
     rings.push({ z: wt + depth, ow: tw, oh: th });
   }
 
