@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { geometryToAsciiStl } from "./geometry3d";
 
 export type OutletType = "duplex" | "decora";
+export type BevelType = "none" | "chamfer" | "fillet";
 
 export interface OutletCoverDesign {
   name: string;
@@ -19,6 +20,8 @@ export interface OutletCoverDesign {
   screwHoleDiameterMm: number;
   nozzleDiameterMm: number;
   toleranceMm: number;
+  bevelType: BevelType;
+  bevelSizeMm: number;
 }
 
 const DUPLEX_CUTOUT_W = 34.1;
@@ -52,6 +55,8 @@ export function createInitialOutletCoverDesign(): OutletCoverDesign {
     screwHoleDiameterMm: 3.5,
     nozzleDiameterMm: 0.4,
     toleranceMm: 0.2,
+    bevelType: "none",
+    bevelSizeMm: 3,
   };
 }
 
@@ -171,25 +176,32 @@ export function createOutletCoverGeometries(design: OutletCoverDesign): THREE.Bu
   const geos: THREE.BufferGeometry[] = [frontGeo];
 
   if (depthMm > 0.1) {
-    const wallZCenter = wt + depthMm / 2;
-
-    const topWall = new THREE.BoxGeometry(tw, wt, depthMm);
-    topWall.translate(0, th / 2 - wt / 2, wallZCenter);
-    geos.push(topWall);
-
-    const botWall = new THREE.BoxGeometry(tw, wt, depthMm);
-    botWall.translate(0, -th / 2 + wt / 2, wallZCenter);
-    geos.push(botWall);
-
     const innerH = Math.max(0.1, th - 2 * wt);
+    const wallShape = createBeveledWallShape(depthMm, wt, design.bevelType, design.bevelSizeMm);
 
-    const leftWall = new THREE.BoxGeometry(wt, innerH, depthMm);
-    leftWall.translate(-tw / 2 + wt / 2, 0, wallZCenter);
-    geos.push(leftWall);
+    // Top wall: shape X=depth, Y=thickness; extrude tw along +Z → then rotate so depth→Z, length→X
+    const topGeo = new THREE.ExtrudeGeometry(wallShape, { depth: tw, bevelEnabled: false, curveSegments: 16 });
+    topGeo.applyMatrix4(new THREE.Matrix4().set(0, 0, -1, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1));
+    topGeo.translate(tw / 2, th / 2 - wt, wt);
+    geos.push(topGeo);
 
-    const rightWall = new THREE.BoxGeometry(wt, innerH, depthMm);
-    rightWall.translate(tw / 2 - wt / 2, 0, wallZCenter);
-    geos.push(rightWall);
+    // Bottom wall: same shape, flip Y so outer face points in -Y
+    const botGeo = new THREE.ExtrudeGeometry(wallShape, { depth: tw, bevelEnabled: false, curveSegments: 16 });
+    botGeo.applyMatrix4(new THREE.Matrix4().set(0, 0, -1, 0,  0, -1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1));
+    botGeo.translate(tw / 2, wt - th / 2, wt);
+    geos.push(botGeo);
+
+    // Left wall: extrude innerH; outer face at -X
+    const leftGeo = new THREE.ExtrudeGeometry(wallShape, { depth: innerH, bevelEnabled: false, curveSegments: 16 });
+    leftGeo.applyMatrix4(new THREE.Matrix4().set(0, -1, 0, 0,  0, 0, 1, 0,  1, 0, 0, 0,  0, 0, 0, 1));
+    leftGeo.translate(-tw / 2 + wt, -innerH / 2, wt);
+    geos.push(leftGeo);
+
+    // Right wall: outer face at +X
+    const rightGeo = new THREE.ExtrudeGeometry(wallShape, { depth: innerH, bevelEnabled: false, curveSegments: 16 });
+    rightGeo.applyMatrix4(new THREE.Matrix4().set(0, 1, 0, 0,  0, 0, 1, 0,  1, 0, 0, 0,  0, 0, 0, 1));
+    rightGeo.translate(tw / 2 - wt, -innerH / 2, wt);
+    geos.push(rightGeo);
   }
 
   const totalDepth = wt + Math.max(0, depthMm);
@@ -234,6 +246,14 @@ export function validateOutletCover(
     warnings.push({ id: "spacing", severity: "error", message: "Oval spacing must exceed cutout height — ovals overlap." });
   if (design.depthMm > 0 && design.depthMm < 0.4)
     warnings.push({ id: "depth", severity: "warning", message: "Wall depth under 0.4mm may not print reliably." });
+  if (design.bevelType !== "none" && design.depthMm > 0.1) {
+    if (design.bevelSizeMm <= 0)
+      warnings.push({ id: "bevel-size", severity: "warning", message: "Bevel selected but bevel size is 0 — no bevel will appear." });
+    if (design.bevelSizeMm >= design.depthMm)
+      warnings.push({ id: "bevel-depth", severity: "warning", message: "Bevel size equals or exceeds wall depth — bevel will be clamped." });
+    if (design.bevelSizeMm >= design.thicknessMm)
+      warnings.push({ id: "bevel-thick", severity: "warning", message: "Bevel size equals or exceeds plate thickness — bevel will be clamped." });
+  }
   if (design.thicknessMm < design.nozzleDiameterMm * 2)
     warnings.push({
       id: "thickness-nozzle",
@@ -272,6 +292,28 @@ export function validateOutletCover(
   }
 
   return warnings;
+}
+
+function createBeveledWallShape(depth: number, wallThick: number, bevelType: BevelType, bevelSize: number): THREE.Shape {
+  const bs = Math.min(bevelSize, depth * 0.9, wallThick * 0.9);
+  const shape = new THREE.Shape();
+  // Profile in XY: X = depth (0=front plate back, depth=wall back), Y = thickness (0=inner, wallThick=outer)
+  shape.moveTo(0, 0);
+  shape.lineTo(0, wallThick);
+  if (bevelType === "chamfer" && bs > 0) {
+    shape.lineTo(depth - bs, wallThick);
+    shape.lineTo(depth, wallThick - bs);
+  } else if (bevelType === "fillet" && bs > 0) {
+    shape.lineTo(depth - bs, wallThick);
+    // Quarter-circle arc centered at (depth, wallThick) sweeping from 180° to 270° CCW
+    // This curves inward (away from the corner), removing material
+    shape.absarc(depth, wallThick, bs, Math.PI, 3 * Math.PI / 2, false);
+  } else {
+    shape.lineTo(depth, wallThick);
+  }
+  shape.lineTo(depth, 0);
+  shape.closePath();
+  return shape;
 }
 
 function addScrewHole(shape: THREE.Shape, x: number, y: number, diameterMm: number) {

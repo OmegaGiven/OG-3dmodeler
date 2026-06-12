@@ -2,6 +2,7 @@ import { ReactNode, useMemo, useState } from "react";
 import { Circle, Download, MoveHorizontal, MoveVertical, Ruler, Square } from "lucide-react";
 import { downloadText, safeName } from "../lib/export2d";
 import {
+  BevelType,
   createInitialOutletCoverDesign,
   createOutletCoverGeometries,
   OutletCoverDesign,
@@ -199,6 +200,30 @@ export function OutletCoverTool() {
             onChange={(e) => updateCover({ depthMm: Math.max(0, inputToMm(Number(e.target.value))) })}
           />
         </label>
+
+        {cover.depthMm > 0.1 && (
+          <label>
+            <FieldLabel icon={<Ruler size={18} />} title="Wall bevel" />
+            <select value={cover.bevelType} onChange={(e) => updateCover({ bevelType: e.target.value as BevelType })}>
+              <option value="none">None</option>
+              <option value="chamfer">Chamfer (straight)</option>
+              <option value="fillet">Fillet (curved)</option>
+            </select>
+          </label>
+        )}
+
+        {cover.depthMm > 0.1 && cover.bevelType !== "none" && (
+          <label>
+            <FieldLabel icon={<Ruler size={18} />} title="Bevel size" />
+            <input
+              type="number"
+              min="0.5"
+              step={minStep}
+              value={displayMm(cover.bevelSizeMm)}
+              onChange={(e) => updateCover({ bevelSizeMm: inputToMm(Number(e.target.value)) })}
+            />
+          </label>
+        )}
 
         <label>
           <FieldLabel icon={<Ruler size={18} />} title="Plate thickness" />
