@@ -176,32 +176,7 @@ export function createOutletCoverGeometries(design: OutletCoverDesign): THREE.Bu
   const geos: THREE.BufferGeometry[] = [frontGeo];
 
   if (depthMm > 0.1) {
-    const innerH = Math.max(0.1, th - 2 * wt);
-    const wallShape = createBeveledWallShape(depthMm, wt, design.bevelType, design.bevelSizeMm);
-
-    // Top wall: shape X=depth, Y=thickness; extrude tw along +Z → then rotate so depth→Z, length→X
-    const topGeo = new THREE.ExtrudeGeometry(wallShape, { depth: tw, bevelEnabled: false, curveSegments: 16 });
-    topGeo.applyMatrix4(new THREE.Matrix4().set(0, 0, -1, 0,  0, 1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1));
-    topGeo.translate(tw / 2, th / 2 - wt, wt);
-    geos.push(topGeo);
-
-    // Bottom wall: same shape, flip Y so outer face points in -Y
-    const botGeo = new THREE.ExtrudeGeometry(wallShape, { depth: tw, bevelEnabled: false, curveSegments: 16 });
-    botGeo.applyMatrix4(new THREE.Matrix4().set(0, 0, -1, 0,  0, -1, 0, 0,  1, 0, 0, 0,  0, 0, 0, 1));
-    botGeo.translate(tw / 2, wt - th / 2, wt);
-    geos.push(botGeo);
-
-    // Left wall: extrude innerH; outer face at -X
-    const leftGeo = new THREE.ExtrudeGeometry(wallShape, { depth: innerH, bevelEnabled: false, curveSegments: 16 });
-    leftGeo.applyMatrix4(new THREE.Matrix4().set(0, -1, 0, 0,  0, 0, 1, 0,  1, 0, 0, 0,  0, 0, 0, 1));
-    leftGeo.translate(-tw / 2 + wt, -innerH / 2, wt);
-    geos.push(leftGeo);
-
-    // Right wall: outer face at +X
-    const rightGeo = new THREE.ExtrudeGeometry(wallShape, { depth: innerH, bevelEnabled: false, curveSegments: 16 });
-    rightGeo.applyMatrix4(new THREE.Matrix4().set(0, 1, 0, 0,  0, 0, 1, 0,  1, 0, 0, 0,  0, 0, 0, 1));
-    rightGeo.translate(tw / 2 - wt, -innerH / 2, wt);
-    geos.push(rightGeo);
+    geos.push(createWallRingGeo(tw, th, wt, depthMm, design.bevelType, design.bevelSizeMm));
   }
 
   const totalDepth = wt + Math.max(0, depthMm);
@@ -294,26 +269,74 @@ export function validateOutletCover(
   return warnings;
 }
 
-function createBeveledWallShape(depth: number, wallThick: number, bevelType: BevelType, bevelSize: number): THREE.Shape {
-  const bs = Math.min(bevelSize, depth * 0.9, wallThick * 0.9);
-  const shape = new THREE.Shape();
-  // Profile in XY: X = depth (0=front plate back, depth=wall back), Y = thickness (0=inner, wallThick=outer)
-  shape.moveTo(0, 0);
-  shape.lineTo(0, wallThick);
+function createWallRingGeo(
+  tw: number, th: number, wt: number, depth: number,
+  bevelType: BevelType, bevelSize: number,
+): THREE.BufferGeometry {
+  const iw = tw - 2 * wt;
+  const ih = th - 2 * wt;
+  const bs = bevelType !== "none" ? Math.min(bevelSize, depth * 0.9, wt * 0.9) : 0;
+
+  // Build sequence of outer-rect cross-sections at increasing Z; inner rect stays iw×ih throughout.
+  // At each corner, both adjacent bevel slopes taper simultaneously → clean mitered corners, no seams.
+  const rings: Array<{ z: number; ow: number; oh: number }> = [{ z: wt, ow: tw, oh: th }];
+
   if (bevelType === "chamfer" && bs > 0) {
-    shape.lineTo(depth - bs, wallThick);
-    shape.lineTo(depth, wallThick - bs);
+    rings.push({ z: wt + depth - bs, ow: tw, oh: th });
+    rings.push({ z: wt + depth, ow: tw - 2 * bs, oh: th - 2 * bs });
   } else if (bevelType === "fillet" && bs > 0) {
-    shape.lineTo(depth - bs, wallThick);
-    // Quarter-circle arc centered at (depth, wallThick) sweeping from 180° to 270° CCW
-    // This curves inward (away from the corner), removing material
-    shape.absarc(depth, wallThick, bs, Math.PI, 3 * Math.PI / 2, false);
+    const segs = 12;
+    for (let i = 0; i <= segs; i++) {
+      const angle = (i / segs) * (Math.PI / 2);
+      const shrink = bs * (1 - Math.cos(angle));
+      rings.push({ z: wt + depth - bs + bs * Math.sin(angle), ow: tw - 2 * shrink, oh: th - 2 * shrink });
+    }
   } else {
-    shape.lineTo(depth, wallThick);
+    rings.push({ z: wt + depth, ow: tw, oh: th });
   }
-  shape.lineTo(depth, 0);
-  shape.closePath();
-  return shape;
+
+  const N = rings.length;
+  const positions: number[] = [];
+
+  // Per-ring vertices: [0..3] outer TL/TR/BR/BL, [4..7] inner TL/TR/BR/BL
+  const rv = rings.map(({ z, ow, oh }): Array<[number, number, number]> => [
+    [-ow / 2,  oh / 2, z], [ ow / 2,  oh / 2, z],
+    [ ow / 2, -oh / 2, z], [-ow / 2, -oh / 2, z],
+    [-iw / 2,  ih / 2, z], [ iw / 2,  ih / 2, z],
+    [ iw / 2, -ih / 2, z], [-iw / 2, -ih / 2, z],
+  ]);
+
+  const tri = (a: [number,number,number], b: [number,number,number], c: [number,number,number]) =>
+    positions.push(a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]);
+
+  const quad = (
+    p0: [number,number,number], p1: [number,number,number],
+    p2: [number,number,number], p3: [number,number,number],
+    flip: boolean,
+  ) => {
+    if (flip) { tri(p0, p2, p1); tri(p0, p3, p2); }
+    else       { tri(p0, p1, p2); tri(p0, p2, p3); }
+  };
+
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    quad(rv[0][i],   rv[0][j],   rv[0][4+j],   rv[0][4+i],   false); // front frame, -Z normal
+    quad(rv[N-1][i], rv[N-1][j], rv[N-1][4+j], rv[N-1][4+i], true);  // back frame,  +Z normal
+    quad(rv[0][4+i], rv[0][4+j], rv[N-1][4+j], rv[N-1][4+i], false); // inner walls, inward normal
+  }
+
+  // Outer lateral faces across consecutive ring pairs
+  for (let r = 0; r < N - 1; r++) {
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) % 4;
+      quad(rv[r][i], rv[r][j], rv[r+1][j], rv[r+1][i], true); // outward XY normal
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
 }
 
 function addScrewHole(shape: THREE.Shape, x: number, y: number, diameterMm: number) {
