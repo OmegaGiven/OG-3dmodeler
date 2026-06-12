@@ -201,18 +201,16 @@ export function OutletCoverTool() {
           />
         </label>
 
-        {cover.depthMm > 0.1 && (
-          <label>
-            <FieldLabel icon={<Ruler size={18} />} title="Wall bevel" />
-            <select value={cover.bevelType} onChange={(e) => updateCover({ bevelType: e.target.value as BevelType })}>
-              <option value="none">None</option>
-              <option value="chamfer">Chamfer (straight)</option>
-              <option value="fillet">Fillet (curved)</option>
-            </select>
-          </label>
-        )}
+        <label>
+          <FieldLabel icon={<Ruler size={18} />} title="Edge bevel" />
+          <select value={cover.bevelType} onChange={(e) => updateCover({ bevelType: e.target.value as BevelType })}>
+            <option value="none">None</option>
+            <option value="chamfer">Chamfer (straight)</option>
+            <option value="fillet">Fillet (curved)</option>
+          </select>
+        </label>
 
-        {cover.depthMm > 0.1 && cover.bevelType !== "none" && (
+        {cover.bevelType !== "none" && (
           <label>
             <FieldLabel icon={<Ruler size={18} />} title="Bevel size" />
             <input

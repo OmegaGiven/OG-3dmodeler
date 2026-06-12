@@ -231,13 +231,13 @@ export function validateOutletCover(
     warnings.push({ id: "spacing", severity: "error", message: "Oval spacing must exceed cutout height — ovals overlap." });
   if (design.depthMm > 0 && design.depthMm < 0.4)
     warnings.push({ id: "depth", severity: "warning", message: "Wall depth under 0.4mm may not print reliably." });
-  if (design.bevelType !== "none" && design.depthMm > 0.1) {
+  if (design.bevelType !== "none") {
     if (design.bevelSizeMm <= 0)
       warnings.push({ id: "bevel-size", severity: "warning", message: "Bevel selected but bevel size is 0 — no bevel will appear." });
-    if (design.bevelSizeMm >= design.depthMm)
-      warnings.push({ id: "bevel-depth", severity: "warning", message: "Bevel size equals or exceeds wall depth — bevel will be clamped." });
     if (design.bevelSizeMm >= design.thicknessMm)
       warnings.push({ id: "bevel-thick", severity: "warning", message: "Bevel size equals or exceeds plate thickness — bevel will be clamped." });
+    if (design.depthMm > 0.1 && design.bevelSizeMm >= design.depthMm)
+      warnings.push({ id: "bevel-depth", severity: "warning", message: "Bevel size equals or exceeds wall depth — bevel will be clamped." });
   }
   if (design.thicknessMm < design.nozzleDiameterMm * 2)
     warnings.push({
@@ -412,6 +412,21 @@ function createFrontEdgeBevelRing(
       const j = (i + 1) % 4;
       quad(v0[i], v0[j], v1[j], v1[i], true);
     }
+  }
+
+  // Back frame closes the outer strip at z=wt (needed when no wall ring is present)
+  const lastZ = outerRings[outerRings.length - 1].z;
+  const vO: Array<[number,number,number]> = [
+    [-tw/2,  th/2, lastZ], [ tw/2,  th/2, lastZ],
+    [ tw/2, -th/2, lastZ], [-tw/2, -th/2, lastZ],
+  ];
+  const vI: Array<[number,number,number]> = [
+    [-iw/2,  ih/2, lastZ], [ iw/2,  ih/2, lastZ],
+    [ iw/2, -ih/2, lastZ], [-iw/2, -ih/2, lastZ],
+  ];
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    quad(vO[i], vO[j], vI[j], vI[i], true);
   }
 
   const geo = new THREE.BufferGeometry();
