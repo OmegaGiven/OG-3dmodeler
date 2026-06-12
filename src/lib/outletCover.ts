@@ -142,11 +142,17 @@ export function createOutletCoverGeometries(design: OutletCoverDesign): THREE.Bu
 
   const wt = Math.max(0.4, thicknessMm);
 
+  // Bevel size clamped so the inner plate stays valid
+  const bs = design.bevelType !== "none"
+    ? Math.min(design.bevelSizeMm, wt * 0.9, tw / 2 - 1, th / 2 - 1)
+    : 0;
+
+  // Face plate outer boundary is shrunk by bs so the bevel ring covers the outer perimeter
   const frontShape = new THREE.Shape();
-  frontShape.moveTo(-tw / 2, -th / 2);
-  frontShape.lineTo(tw / 2, -th / 2);
-  frontShape.lineTo(tw / 2, th / 2);
-  frontShape.lineTo(-tw / 2, th / 2);
+  frontShape.moveTo(-(tw / 2 - bs), -(th / 2 - bs));
+  frontShape.lineTo( (tw / 2 - bs), -(th / 2 - bs));
+  frontShape.lineTo( (tw / 2 - bs),  (th / 2 - bs));
+  frontShape.lineTo(-(tw / 2 - bs),  (th / 2 - bs));
   frontShape.closePath();
 
   if (outletType === "duplex") {
@@ -175,8 +181,12 @@ export function createOutletCoverGeometries(design: OutletCoverDesign): THREE.Bu
 
   const geos: THREE.BufferGeometry[] = [frontGeo];
 
+  if (bs > 0) {
+    geos.push(createFrontEdgeBevelRing(tw, th, bs, wt, design.bevelType));
+  }
+
   if (depthMm > 0.1) {
-    geos.push(createWallRingGeo(tw, th, wt, depthMm, design.bevelType, design.bevelSizeMm));
+    geos.push(createWallRingGeo(tw, th, wt, depthMm, "none", 0));
   }
 
   const totalDepth = wt + Math.max(0, depthMm);
@@ -336,6 +346,87 @@ function createWallRingGeo(
       const j = (i + 1) % 4;
       quad(rv[r][i], rv[r][j], rv[r+1][j], rv[r+1][i], true); // outward XY normal
     }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// Outer edge bevel ring: covers the perimeter of the face plate from z=0 to z=wt.
+// The outer boundary grows from (tw-2bs)×(th-2bs) at z=0 (matching the shrunk plate front)
+// to tw×th at z=bs (chamfer/fillet complete), then stays straight to z=wt.
+// Inner boundary stays fixed at (tw-2bs)×(th-2bs) throughout, matching the plate outer edge.
+function createFrontEdgeBevelRing(
+  tw: number, th: number, bs: number, wt: number,
+  bevelType: BevelType,
+): THREE.BufferGeometry {
+  const iw = tw - 2 * bs;
+  const ih = th - 2 * bs;
+
+  const outerRings: Array<{ z: number; ow: number; oh: number }> = [];
+
+  if (bevelType === "chamfer") {
+    outerRings.push({ z: 0, ow: iw, oh: ih }); // front, knife edge (outer=inner)
+    outerRings.push({ z: bs, ow: tw, oh: th }); // chamfer complete
+  } else {
+    const segs = 12;
+    for (let i = 0; i <= segs; i++) {
+      const angle = (i / segs) * (Math.PI / 2);
+      const grow = bs * Math.sin(angle);
+      outerRings.push({ z: bs * (1 - Math.cos(angle)), ow: iw + 2 * grow, oh: ih + 2 * grow });
+    }
+  }
+
+  if (wt > bs + 0.01) {
+    outerRings.push({ z: wt, ow: tw, oh: th }); // straight outer wall to plate back
+  }
+
+  const positions: number[] = [];
+
+  const tri = (a: [number,number,number], b: [number,number,number], c: [number,number,number]) =>
+    positions.push(a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]);
+
+  const quad = (
+    p0: [number,number,number], p1: [number,number,number],
+    p2: [number,number,number], p3: [number,number,number],
+    flip: boolean,
+  ) => {
+    if (flip) { tri(p0, p2, p1); tri(p0, p3, p2); }
+    else       { tri(p0, p1, p2); tri(p0, p2, p3); }
+  };
+
+  for (let r = 0; r < outerRings.length - 1; r++) {
+    const { z: z0, ow: ow0, oh: oh0 } = outerRings[r];
+    const { z: z1, ow: ow1, oh: oh1 } = outerRings[r + 1];
+    const v0: Array<[number,number,number]> = [
+      [-ow0/2,  oh0/2, z0], [ ow0/2,  oh0/2, z0],
+      [ ow0/2, -oh0/2, z0], [-ow0/2, -oh0/2, z0],
+    ];
+    const v1: Array<[number,number,number]> = [
+      [-ow1/2,  oh1/2, z1], [ ow1/2,  oh1/2, z1],
+      [ ow1/2, -oh1/2, z1], [-ow1/2, -oh1/2, z1],
+    ];
+    for (let i = 0; i < 4; i++) {
+      const j = (i + 1) % 4;
+      quad(v0[i], v0[j], v1[j], v1[i], true);
+    }
+  }
+
+  // Back frame at z=wt: annular face closing the outer strip against the back of the plate
+  const lastZ = outerRings[outerRings.length - 1].z;
+  const vO: Array<[number,number,number]> = [
+    [-tw/2,  th/2, lastZ], [ tw/2,  th/2, lastZ],
+    [ tw/2, -th/2, lastZ], [-tw/2, -th/2, lastZ],
+  ];
+  const vI: Array<[number,number,number]> = [
+    [-iw/2,  ih/2, lastZ], [ iw/2,  ih/2, lastZ],
+    [ iw/2, -ih/2, lastZ], [-iw/2, -ih/2, lastZ],
+  ];
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    quad(vO[i], vO[j], vI[j], vI[i], true);
   }
 
   const geo = new THREE.BufferGeometry();
