@@ -16,6 +16,7 @@ export interface OutletCoverDesign {
   marginRightMm: number;
   depthMm: number;
   thicknessMm: number;
+  screwHoleDiameterMm: number;
   nozzleDiameterMm: number;
   toleranceMm: number;
 }
@@ -31,6 +32,9 @@ const DECORA_CUTOUT_H = 70.6;
 const DECORA_MARGIN_TB = 21.9;
 const DECORA_MARGIN_LR = 12.4;
 
+// Decora strap-mount screw spacing: 3-13/16" = 96.8mm center-to-center
+const DECORA_SCREW_SPACING_MM = 96.8;
+
 export function createInitialOutletCoverDesign(): OutletCoverDesign {
   return {
     name: "New outlet cover",
@@ -45,6 +49,7 @@ export function createInitialOutletCoverDesign(): OutletCoverDesign {
     marginRightMm: DUPLEX_MARGIN_LR,
     depthMm: 0,
     thicknessMm: 3,
+    screwHoleDiameterMm: 3.5,
     nozzleDiameterMm: 0.4,
     toleranceMm: 0.2,
   };
@@ -146,9 +151,15 @@ export function createOutletCoverGeometries(design: OutletCoverDesign): THREE.Bu
     for (const yHole of [cy + ovalSpacingMm / 2, cy - ovalSpacingMm / 2]) {
       frontShape.holes.push(roundedRectHole(cx, yHole, cw, ch, stadiumR));
     }
+    // Single center screw hole between the two openings
+    addScrewHole(frontShape, 0, 0, design.screwHoleDiameterMm);
   } else {
     const r = Math.min(Math.max(0.5, cornerRadiusMm), cw / 2, ch / 2);
     frontShape.holes.push(roundedRectHole(cx, cy, cw, ch, r));
+    // Two screw holes: 3-13/16" (96.8mm) apart, centered on plate
+    const sy = DECORA_SCREW_SPACING_MM / 2;
+    addScrewHole(frontShape, 0, sy, design.screwHoleDiameterMm);
+    addScrewHole(frontShape, 0, -sy, design.screwHoleDiameterMm);
   }
 
   const frontGeo = new THREE.ExtrudeGeometry(frontShape, {
@@ -243,7 +254,31 @@ export function validateOutletCover(
       message: "Tolerance equals or exceeds smallest margin — cutout may reach plate edge.",
     });
 
+  const { heightMm } = outletCoverTotalSize(design);
+  const sr = design.screwHoleDiameterMm / 2;
+
+  if (design.outletType === "duplex") {
+    // Screw at plate center; nearest cutout edge = ovalSpacingMm/2 - (ch/2)
+    const t = Math.max(0, design.toleranceMm);
+    const ch = design.cutoutHeightMm + t * 2;
+    const gap = design.ovalSpacingMm / 2 - ch / 2 - sr;
+    if (gap < 0.5)
+      warnings.push({ id: "screw-cutout", severity: "warning", message: "Center screw hole nearly overlaps outlet openings — increase oval spacing or reduce screw hole diameter." });
+  } else {
+    // Screw holes at ±DECORA_SCREW_SPACING_MM/2 from plate center
+    const screwEdge = DECORA_SCREW_SPACING_MM / 2 + sr;
+    if (screwEdge > heightMm / 2)
+      warnings.push({ id: "screw-oob", severity: "error", message: "Decora screw holes extend outside plate — increase top/bottom margins." });
+  }
+
   return warnings;
+}
+
+function addScrewHole(shape: THREE.Shape, x: number, y: number, diameterMm: number) {
+  const r = Math.max(0.5, diameterMm / 2);
+  const hole = new THREE.Path();
+  hole.absellipse(x, y, r, r, 0, Math.PI * 2, true, 0);
+  shape.holes.push(hole);
 }
 
 function roundedRectHole(cx: number, cy: number, w: number, h: number, r: number): THREE.Path {

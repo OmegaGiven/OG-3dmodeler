@@ -212,6 +212,17 @@ export function OutletCoverTool() {
         </label>
 
         <label>
+          <FieldLabel icon={<Ruler size={18} />} title="Screw hole" />
+          <input
+            type="number"
+            min="1"
+            step="0.1"
+            value={displayMm(cover.screwHoleDiameterMm)}
+            onChange={(e) => updateCover({ screwHoleDiameterMm: inputToMm(Number(e.target.value)) })}
+          />
+        </label>
+
+        <label>
           <FieldLabel icon={<Ruler size={18} />} title="Nozzle" />
           <input
             type="number"
