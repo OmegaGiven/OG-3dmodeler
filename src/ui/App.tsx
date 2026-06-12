@@ -18,6 +18,7 @@ import {
   Save,
   Settings,
   CircleDot,
+  Plug,
   Type,
   Undo2,
   X,
@@ -49,13 +50,14 @@ import {
 } from "../shared/design";
 import { createId } from "../shared/id";
 import { LidMakerTool } from "./LidMakerTool";
+import { OutletCoverTool } from "./OutletCoverTool";
 import { ThreePreview } from "./ThreePreview";
 import { WasherTool } from "./WasherTool";
 
 const MAX_SCALE = 8;
 const MAX_HISTORY = 80;
 const FONTS = ["Inter", "Arial", "Georgia", "Courier New", "Trebuchet MS"];
-type ActiveTool = "business-card" | "lid-maker" | "washer";
+type ActiveTool = "business-card" | "lid-maker" | "washer" | "outlet-cover";
 
 interface DesignHistory {
   past: Design[];
@@ -442,6 +444,15 @@ export function App() {
     );
   }
 
+  if (activeTool === "outlet-cover") {
+    return (
+      <main className="mobile-shell">
+        <ToolNav activeTool={activeTool} selectTool={selectTool} />
+        <OutletCoverTool />
+      </main>
+    );
+  }
+
   if (view === "export") {
     return (
       <ExportScreen
@@ -670,6 +681,10 @@ function ToolNav(props: { activeTool: ActiveTool; selectTool: (tool: ActiveTool)
       <button className={`tool-tab ${props.activeTool === "washer" ? "active" : ""}`} onClick={() => props.selectTool("washer")}>
         <CircleDot size={18} />
         <span>Washers</span>
+      </button>
+      <button className={`tool-tab ${props.activeTool === "outlet-cover" ? "active" : ""}`} onClick={() => props.selectTool("outlet-cover")}>
+        <Plug size={18} />
+        <span>Outlets</span>
       </button>
     </nav>
   );
