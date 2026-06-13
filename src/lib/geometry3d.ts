@@ -70,6 +70,18 @@ export function createRaisedElementGeometries(design: Design) {
   return geometries;
 }
 
+function fmtFloat(n: number): string {
+  // Clamp floating-point noise to zero, then emit fixed-decimal notation.
+  // Scientific notation (e.g. 1e-16) is not valid in the STL spec and breaks
+  // some slicer parsers (including Bambu Studio).
+  const v = Math.abs(n) < 1e-10 ? 0 : n;
+  return v.toFixed(6);
+}
+
+function fmtVec(v: THREE.Vector3): string {
+  return `${fmtFloat(v.x)} ${fmtFloat(v.y)} ${fmtFloat(v.z)}`;
+}
+
 export function geometryToAsciiStl(name: string, geometries: THREE.BufferGeometry[]) {
   const lines = [`solid ${name.replace(/\s+/g, "_")}`];
   for (const geometry of geometries) {
@@ -80,11 +92,11 @@ export function geometryToAsciiStl(name: string, geometries: THREE.BufferGeometr
       const b = new THREE.Vector3().fromBufferAttribute(position, i + 1);
       const c = new THREE.Vector3().fromBufferAttribute(position, i + 2);
       const normal = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
-      lines.push(`facet normal ${normal.x} ${normal.y} ${normal.z}`);
+      lines.push(`facet normal ${fmtVec(normal)}`);
       lines.push("  outer loop");
-      lines.push(`    vertex ${a.x} ${a.y} ${a.z}`);
-      lines.push(`    vertex ${b.x} ${b.y} ${b.z}`);
-      lines.push(`    vertex ${c.x} ${c.y} ${c.z}`);
+      lines.push(`    vertex ${fmtVec(a)}`);
+      lines.push(`    vertex ${fmtVec(b)}`);
+      lines.push(`    vertex ${fmtVec(c)}`);
       lines.push("  endloop");
       lines.push("endfacet");
     }
