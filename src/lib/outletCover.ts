@@ -54,7 +54,7 @@ export function createInitialOutletCoverDesign(): OutletCoverDesign {
     thicknessMm: 3,
     screwHoleDiameterMm: 3.5,
     nozzleDiameterMm: 0.4,
-    toleranceMm: 0.2,
+    toleranceMm: 0.4,
     bevelType: "none",
     bevelSizeMm: 3,
   };
