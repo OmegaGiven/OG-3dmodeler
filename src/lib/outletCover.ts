@@ -438,24 +438,61 @@ function createFrontEdgeBevelRing(
 
 function addScrewHole(shape: THREE.Shape, x: number, y: number, diameterMm: number) {
   const r = Math.max(0.5, diameterMm / 2);
+  // Use manually-computed points instead of absellipse (which creates an EllipseCurve that
+  // ExtrudeGeometry oversamples by 2×, producing ~0.18mm spacing that causes near-zero-area
+  // Earcut bridge triangles which Bambu Studio mesh repair removes, then fills as solid).
+  // Target ~1mm per segment so Earcut bridges always land on well-separated points.
+  const segs = Math.max(16, Math.ceil(2 * Math.PI * r));
+  const pts: THREE.Vector2[] = [];
+  for (let i = 0; i <= segs; i++) {
+    const angle = -2 * Math.PI * i / segs; // negative = CW winding
+    pts.push(new THREE.Vector2(x + r * Math.cos(angle), y + r * Math.sin(angle)));
+  }
   const hole = new THREE.Path();
-  hole.absellipse(x, y, r, r, 0, Math.PI * 2, true, 0);
+  hole.setFromPoints(pts);
   shape.holes.push(hole);
 }
 
 function roundedRectHole(cx: number, cy: number, w: number, h: number, r: number): THREE.Path {
+  // Use manually-computed points instead of absarc (EllipseCurve gets 2× oversampled by
+  // ExtrudeGeometry, creating ~0.18mm point spacing that causes degenerate Earcut bridges).
+  // Target ~1mm per arc segment; LineCurves via setFromPoints bypass the 2× multiplier.
+  const segs = Math.max(4, Math.ceil((Math.PI / 2) * r));
+
+  const pts: THREE.Vector2[] = [];
+  const addPt = (x: number, y: number) => {
+    const last = pts[pts.length - 1];
+    if (!last || Math.abs(last.x - x) > 1e-6 || Math.abs(last.y - y) > 1e-6) {
+      pts.push(new THREE.Vector2(x, y));
+    }
+  };
+
+  // CW winding: top-left → top-right → arc TR → right → arc BR → bottom-left → arc BL → left → arc TL → close
+  addPt(cx - w / 2 + r, cy + h / 2);
+  addPt(cx + w / 2 - r, cy + h / 2);
+  for (let i = 1; i <= segs; i++) {
+    const a = Math.PI / 2 * (1 - i / segs); // PI/2 → 0 (CW)
+    addPt(cx + w / 2 - r + r * Math.cos(a), cy + h / 2 - r + r * Math.sin(a));
+  }
+  addPt(cx + w / 2, cy - h / 2 + r);
+  for (let i = 1; i <= segs; i++) {
+    const a = -Math.PI / 2 * i / segs; // 0 → -PI/2 (CW)
+    addPt(cx + w / 2 - r + r * Math.cos(a), cy - h / 2 + r + r * Math.sin(a));
+  }
+  addPt(cx - w / 2 + r, cy - h / 2);
+  for (let i = 1; i <= segs; i++) {
+    const a = -Math.PI / 2 - Math.PI / 2 * i / segs; // -PI/2 → -PI (CW)
+    addPt(cx - w / 2 + r + r * Math.cos(a), cy - h / 2 + r + r * Math.sin(a));
+  }
+  addPt(cx - w / 2, cy + h / 2 - r);
+  for (let i = 1; i <= segs; i++) {
+    const a = Math.PI - Math.PI / 2 * i / segs; // PI → PI/2 (CW)
+    addPt(cx - w / 2 + r + r * Math.cos(a), cy + h / 2 - r + r * Math.sin(a));
+  }
+  addPt(cx - w / 2 + r, cy + h / 2); // close back to start
+
   const path = new THREE.Path();
-  // CW winding so THREE.js treats this as a hole in the parent shape
-  path.moveTo(cx - w / 2 + r, cy + h / 2);
-  path.lineTo(cx + w / 2 - r, cy + h / 2);
-  path.absarc(cx + w / 2 - r, cy + h / 2 - r, r, Math.PI / 2, 0, true);
-  path.lineTo(cx + w / 2, cy - h / 2 + r);
-  path.absarc(cx + w / 2 - r, cy - h / 2 + r, r, 0, -Math.PI / 2, true);
-  path.lineTo(cx - w / 2 + r, cy - h / 2);
-  path.absarc(cx - w / 2 + r, cy - h / 2 + r, r, -Math.PI / 2, -Math.PI, true);
-  path.lineTo(cx - w / 2, cy + h / 2 - r);
-  path.absarc(cx - w / 2 + r, cy + h / 2 - r, r, Math.PI, Math.PI / 2, true);
-  path.closePath();
+  path.setFromPoints(pts);
   return path;
 }
 
