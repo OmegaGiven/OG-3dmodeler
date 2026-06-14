@@ -31,7 +31,7 @@ import { designToSvg, downloadText, exportPdf, exportPngFromDesign, safeName } f
 import { validatePrintability } from "../lib/printability";
 import { createQrMatrix } from "../lib/qr";
 import { extractSafeSvgPathData } from "../lib/sanitizeSvg";
-import { designToAsciiStl } from "../lib/stl";
+import { designToAsciiStl, designToStep } from "../lib/stl";
 import { loadLocalDesign, saveLocalDesign } from "../lib/storage";
 import {
   CARD_SIZES,
@@ -312,6 +312,17 @@ export function App() {
     setStatus("STL downloaded.");
   }
 
+  function exportStep() {
+    const errors = validatePrintability(design).filter((warning) => warning.severity === "error");
+    if (errors.length > 0) {
+      setStatus(`Fix ${errors.length} printability error${errors.length === 1 ? "" : "s"} before STEP export.`);
+      return;
+    }
+
+    downloadText(`${safeName(design.name)}.step`, designToStep(design), "model/step");
+    setStatus("STEP downloaded.");
+  }
+
   function selectElement(element: CardElement) {
     setSelectedId(element.id);
     const now = Date.now();
@@ -462,6 +473,7 @@ export function App() {
         setStatus={setStatus}
         saveDesign={saveDesign}
         exportStl={exportStl}
+        exportStep={exportStep}
         activeTool={activeTool}
         selectTool={selectTool}
         back={() => setView("editor")}
@@ -594,6 +606,7 @@ function ExportScreen(props: {
   setStatus: (status: string) => void;
   saveDesign: () => void;
   exportStl: () => void;
+  exportStep: () => void;
   activeTool: ActiveTool;
   selectTool: (tool: ActiveTool) => void;
   back: () => void;
@@ -644,6 +657,10 @@ function ExportScreen(props: {
         <button onClick={() => runExport(props.exportStl, "STL downloaded.")}>
           <Box size={20} />
           <span>STL</span>
+        </button>
+        <button onClick={() => runExport(props.exportStep, "STEP downloaded.")}>
+          <Box size={20} />
+          <span>STEP</span>
         </button>
         <button onClick={() => runExport(props.saveDesign, "Design saved locally.")}>
           <Save size={20} />

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { geometryToAsciiStl } from "./geometry3d";
+import { geometryToAsciiStl, geometryToStep } from "./geometry3d";
 
 export interface WasherDesign {
   name: string;
@@ -43,6 +43,15 @@ export function washerToAsciiStl(design: WasherDesign) {
   const geometry = createWasherGeometry(design);
   try {
     return geometryToAsciiStl(design.name, [geometry]);
+  } finally {
+    geometry.dispose();
+  }
+}
+
+export function washerToStep(design: WasherDesign) {
+  const geometry = createWasherGeometry(design);
+  try {
+    return geometryToStep(design.name, [geometry]);
   } finally {
     geometry.dispose();
   }

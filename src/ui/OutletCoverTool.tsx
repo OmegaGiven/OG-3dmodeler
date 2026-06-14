@@ -8,6 +8,7 @@ import {
   OutletCoverDesign,
   outletCoverSizeLabel,
   outletCoverToAsciiStl,
+  outletCoverToStep,
   outletCoverTotalSize,
   switchOutletType,
   validateOutletCover,
@@ -41,6 +42,16 @@ export function OutletCoverTool() {
     }
     downloadText(`${safeName(cover.name)}.stl`, outletCoverToAsciiStl(cover), "model/stl");
     setStatus("STL downloaded.");
+  }
+
+  function exportStep() {
+    const errors = warnings.filter((w) => w.severity === "error");
+    if (errors.length > 0) {
+      setStatus(`Fix ${errors.length} setting${errors.length === 1 ? "" : "s"} before STEP export.`);
+      return;
+    }
+    downloadText(`${safeName(cover.name)}.step`, outletCoverToStep(cover), "model/step");
+    setStatus("STEP downloaded.");
   }
 
   const { widthMm, heightMm } = outletCoverTotalSize(cover);
@@ -273,6 +284,10 @@ export function OutletCoverTool() {
         <button onClick={exportStl}>
           <Download size={20} />
           <span>Export STL</span>
+        </button>
+        <button onClick={exportStep}>
+          <Download size={20} />
+          <span>Export STEP</span>
         </button>
       </div>
 

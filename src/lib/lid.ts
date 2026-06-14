@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { geometryToAsciiStl } from "./geometry3d";
+import { geometryToAsciiStl, geometryToStep } from "./geometry3d";
 
 export type LidShape = "round" | "square";
 export type LidFit = "inner" | "outer";
@@ -44,6 +44,17 @@ export function lidToAsciiStl(design: LidDesign) {
   const geometries = createLidGeometries(design);
   try {
     return geometryToAsciiStl(design.name, geometries);
+  } finally {
+    for (const geometry of geometries) {
+      geometry.dispose();
+    }
+  }
+}
+
+export function lidToStep(design: LidDesign) {
+  const geometries = createLidGeometries(design);
+  try {
+    return geometryToStep(design.name, geometries);
   } finally {
     for (const geometry of geometries) {
       geometry.dispose();

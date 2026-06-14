@@ -1,7 +1,7 @@
 import { ReactNode, useMemo, useState } from "react";
 import { Box, Circle, Download, MoveHorizontal, MoveVertical, Ruler, Square } from "lucide-react";
 import { downloadText, safeName } from "../lib/export2d";
-import { createInitialLidDesign, LidDesign, lidSizeLabel, lidToAsciiStl } from "../lib/lid";
+import { createInitialLidDesign, LidDesign, lidSizeLabel, lidToAsciiStl, lidToStep } from "../lib/lid";
 import { inchesToMm, mmToInches } from "../shared/design";
 import { LidPreview } from "./LidPreview";
 
@@ -33,6 +33,17 @@ export function LidMakerTool() {
 
     downloadText(`${safeName(lid.name)}.stl`, lidToAsciiStl(lid), "model/stl");
     setStatus("STL downloaded.");
+  }
+
+  function exportStep() {
+    const errors = warnings.filter((warning) => warning.severity === "error");
+    if (errors.length > 0) {
+      setStatus(`Fix ${errors.length} lid setting${errors.length === 1 ? "" : "s"} before STEP export.`);
+      return;
+    }
+
+    downloadText(`${safeName(lid.name)}.step`, lidToStep(lid), "model/step");
+    setStatus("STEP downloaded.");
   }
 
   return (
@@ -138,6 +149,10 @@ export function LidMakerTool() {
         <button onClick={exportStl}>
           <Download size={20} />
           <span>Export STL</span>
+        </button>
+        <button onClick={exportStep}>
+          <Download size={20} />
+          <span>Export STEP</span>
         </button>
       </div>
 

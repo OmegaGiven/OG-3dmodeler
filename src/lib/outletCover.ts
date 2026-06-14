@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { geometryToAsciiStl } from "./geometry3d";
+import { geometryToAsciiStl, geometryToStep } from "./geometry3d";
 
 export type OutletType = "duplex" | "decora";
 export type BevelType = "none" | "chamfer" | "fillet";
@@ -201,6 +201,17 @@ export function outletCoverToAsciiStl(design: OutletCoverDesign): string {
   const geos = createOutletCoverGeometries(design);
   try {
     return geometryToAsciiStl(design.name, geos);
+  } finally {
+    for (const geo of geos) {
+      geo.dispose();
+    }
+  }
+}
+
+export function outletCoverToStep(design: OutletCoverDesign): string {
+  const geos = createOutletCoverGeometries(design);
+  try {
+    return geometryToStep(design.name, geos);
   } finally {
     for (const geo of geos) {
       geo.dispose();

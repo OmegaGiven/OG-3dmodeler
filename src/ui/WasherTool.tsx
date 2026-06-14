@@ -7,6 +7,7 @@ import {
   WasherDesign,
   washerSizeLabel,
   washerToAsciiStl,
+  washerToStep,
 } from "../lib/washer";
 import { inchesToMm, mmToInches } from "../shared/design";
 import { GeometryPreview } from "./GeometryPreview";
@@ -38,6 +39,17 @@ export function WasherTool() {
 
     downloadText(`${safeName(washer.name)}.stl`, washerToAsciiStl(washer), "model/stl");
     setStatus("STL downloaded.");
+  }
+
+  function exportStep() {
+    const errors = warnings.filter((warning) => warning.severity === "error");
+    if (errors.length > 0) {
+      setStatus(`Fix ${errors.length} washer setting${errors.length === 1 ? "" : "s"} before STEP export.`);
+      return;
+    }
+
+    downloadText(`${safeName(washer.name)}.step`, washerToStep(washer), "model/step");
+    setStatus("STEP downloaded.");
   }
 
   return (
@@ -121,6 +133,10 @@ export function WasherTool() {
         <button onClick={exportStl}>
           <Download size={20} />
           <span>Export STL</span>
+        </button>
+        <button onClick={exportStep}>
+          <Download size={20} />
+          <span>Export STEP</span>
         </button>
       </div>
 
