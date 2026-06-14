@@ -452,10 +452,14 @@ function addScrewHole(shape: THREE.Shape, x: number, y: number, diameterMm: numb
   // Use manually-computed points instead of absellipse (which creates an EllipseCurve that
   // ExtrudeGeometry oversamples by 2×, producing ~0.18mm spacing that causes near-zero-area
   // Earcut bridge triangles which Bambu Studio mesh repair removes, then fills as solid).
-  // Target ~1mm per segment so Earcut bridges always land on well-separated points.
-  const segs = Math.max(16, Math.ceil(2 * Math.PI * r));
+  // Min 8 segments (45° per step): fewer steps than 16 keeps adjacent vertices far enough
+  // apart that none land nearly collinear with Earcut's bridge to the nearest oval boundary,
+  // which was the source of 0.018 mm² triangles that Bambu's repair threshold removes.
+  // Do NOT include the closing point (i < segs, not <=): setFromPoints with a duplicate
+  // endpoint gives Earcut a zero-length edge that can produce degenerate triangles.
+  const segs = Math.max(8, Math.ceil(Math.PI * r));
   const pts: THREE.Vector2[] = [];
-  for (let i = 0; i <= segs; i++) {
+  for (let i = 0; i < segs; i++) {
     const angle = -2 * Math.PI * i / segs; // negative = CW winding
     pts.push(new THREE.Vector2(x + r * Math.cos(angle), y + r * Math.sin(angle)));
   }
