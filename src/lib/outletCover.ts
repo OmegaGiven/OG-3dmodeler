@@ -291,6 +291,14 @@ export function validateOutletCover(
   return warnings;
 }
 
+// Wall front face is pulled slightly INTO the plate volume instead of sitting exactly
+// coincident with the plate's back face. Two solids sharing an exact coplanar face
+// produce zero-thickness duplicate geometry that Bambu Studio's manifold check flags;
+// its auto-repair pass then re-triangulates the area and can erase nearby cutouts.
+// A tiny true volumetric overlap (well under nozzle resolution) makes the union
+// unambiguous for the slicer without any visible/dimensional effect.
+const WELD_OVERLAP_MM = 0.02;
+
 function createWallRingGeo(
   tw: number, th: number, wt: number, depth: number,
   bevelType: BevelType, bevelSize: number,
@@ -318,7 +326,7 @@ function createWallRingGeo(
     }
     rings.push({ z: wt + depth, ow: tw, oh: th }); // back, square
   } else {
-    rings.push({ z: wt, ow: tw, oh: th });
+    rings.push({ z: wt - WELD_OVERLAP_MM, ow: tw, oh: th });
     rings.push({ z: wt + depth, ow: tw, oh: th });
   }
 
