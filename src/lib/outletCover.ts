@@ -219,6 +219,60 @@ export function outletCoverToStep(design: OutletCoverDesign): string {
   }
 }
 
+const OUTLET_COVER_TEMPLATE_VERSION = 1;
+
+export function outletCoverToTemplateJson(design: OutletCoverDesign): string {
+  return JSON.stringify({ kind: "og-3dmodeler-outlet-cover", version: OUTLET_COVER_TEMPLATE_VERSION, design }, null, 2);
+}
+
+export function parseOutletCoverTemplateJson(json: string): OutletCoverDesign {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error("That file isn't valid JSON.");
+  }
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("That file doesn't look like an outlet cover template.");
+  }
+  const record = parsed as Record<string, unknown>;
+  const design = record.design && typeof record.design === "object" ? (record.design as Record<string, unknown>) : record;
+
+  const base = createInitialOutletCoverDesign();
+  type NumericKey = {
+    [K in keyof OutletCoverDesign]: OutletCoverDesign[K] extends number ? K : never;
+  }[keyof OutletCoverDesign];
+  const numberField = (key: NumericKey): number => {
+    const value = design[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : base[key];
+  };
+
+  const outletType: OutletType = design.outletType === "decora" ? "decora" : "duplex";
+  const bevelType: BevelType =
+    design.bevelType === "chamfer" || design.bevelType === "fillet" ? design.bevelType : "none";
+
+  return {
+    ...base,
+    name: typeof design.name === "string" && design.name.trim() ? design.name : base.name,
+    outletType,
+    bevelType,
+    cutoutWidthMm: numberField("cutoutWidthMm"),
+    cutoutHeightMm: numberField("cutoutHeightMm"),
+    ovalSpacingMm: numberField("ovalSpacingMm"),
+    cornerRadiusMm: numberField("cornerRadiusMm"),
+    marginTopMm: numberField("marginTopMm"),
+    marginBottomMm: numberField("marginBottomMm"),
+    marginLeftMm: numberField("marginLeftMm"),
+    marginRightMm: numberField("marginRightMm"),
+    depthMm: numberField("depthMm"),
+    thicknessMm: numberField("thicknessMm"),
+    screwHoleDiameterMm: numberField("screwHoleDiameterMm"),
+    nozzleDiameterMm: numberField("nozzleDiameterMm"),
+    toleranceMm: numberField("toleranceMm"),
+    bevelSizeMm: numberField("bevelSizeMm"),
+  };
+}
+
 export function validateOutletCover(
   design: OutletCoverDesign,
 ): Array<{ id: string; severity: "warning" | "error"; message: string }> {

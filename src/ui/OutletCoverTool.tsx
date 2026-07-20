@@ -1,5 +1,5 @@
-import { ReactNode, useMemo, useState } from "react";
-import { Circle, Download, MoveHorizontal, MoveVertical, Ruler, Square } from "lucide-react";
+import { ReactNode, useMemo, useRef, useState } from "react";
+import { Circle, Download, MoveHorizontal, MoveVertical, Ruler, Square, Upload } from "lucide-react";
 import { downloadText, safeName } from "../lib/export2d";
 import {
   BevelType,
@@ -9,7 +9,9 @@ import {
   outletCoverSizeLabel,
   outletCoverToAsciiStl,
   outletCoverToStep,
+  outletCoverToTemplateJson,
   outletCoverTotalSize,
+  parseOutletCoverTemplateJson,
   switchOutletType,
   validateOutletCover,
 } from "../lib/outletCover";
@@ -21,6 +23,7 @@ export function OutletCoverTool() {
   const [unit, setUnit] = useState<"mm" | "in">("mm");
   const [status, setStatus] = useState("");
   const warnings = useMemo(() => validateOutletCover(cover), [cover]);
+  const templateInputRef = useRef<HTMLInputElement>(null);
 
   function updateCover(patch: Partial<OutletCoverDesign>) {
     setCover((current) => ({ ...current, ...patch }));
@@ -52,6 +55,23 @@ export function OutletCoverTool() {
     }
     downloadText(`${safeName(cover.name)}.step`, outletCoverToStep(cover), "model/step");
     setStatus("STEP downloaded.");
+  }
+
+  function downloadTemplate() {
+    downloadText(`${safeName(cover.name)}.json`, outletCoverToTemplateJson(cover), "application/json");
+    setStatus("Template downloaded.");
+  }
+
+  function loadTemplateFile(file: File) {
+    file
+      .text()
+      .then((text) => {
+        setCover(parseOutletCoverTemplateJson(text));
+        setStatus(`Loaded template "${file.name}".`);
+      })
+      .catch((error: unknown) => {
+        setStatus(error instanceof Error ? error.message : "Couldn't load that template.");
+      });
   }
 
   const { widthMm, heightMm } = outletCoverTotalSize(cover);
@@ -289,6 +309,25 @@ export function OutletCoverTool() {
           <Download size={20} />
           <span>Export STEP</span>
         </button>
+        <button onClick={downloadTemplate}>
+          <Download size={20} />
+          <span>Save template</span>
+        </button>
+        <button onClick={() => templateInputRef.current?.click()}>
+          <Upload size={20} />
+          <span>Load template</span>
+        </button>
+        <input
+          ref={templateInputRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) loadTemplateFile(file);
+            e.target.value = "";
+          }}
+        />
       </div>
 
       <div className="export-warnings">
