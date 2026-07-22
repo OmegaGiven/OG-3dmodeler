@@ -7,6 +7,7 @@ export interface DrywallPlugDesign {
   holeDiameterMm: number;
   drywallThicknessMm: number;
   diskThicknessMm: number;
+  diskFilletMm: number;
   clipWidthMm: number;
   clipThicknessMm: number;
   barbLengthMm: number;
@@ -24,6 +25,7 @@ export function createInitialDrywallPlugDesign(): DrywallPlugDesign {
     holeDiameterMm: 35,
     drywallThicknessMm: 12.7,
     diskThicknessMm: 5,
+    diskFilletMm: 1,
     clipWidthMm: 10,
     clipThicknessMm: 5,
     barbLengthMm: 3,
@@ -48,8 +50,8 @@ export function createDrywallPlugGeometries(design: DrywallPlugDesign): THREE.Bu
   const barbProtrusion = Math.max(0, design.barbProtrusionMm);
   const clipInnerRadius = Math.max(0.2, holeRadius - clipThickness);
 
-  const disk = new THREE.CylinderGeometry(coverRadius, coverRadius, diskThickness, 128);
-  disk.rotateX(Math.PI / 2); // cylinder's default axis is Y; align it to Z
+  const diskFillet = Math.max(0, Math.min(design.diskFilletMm, diskThickness / 2 - 0.05, coverRadius * 0.4));
+  const disk = createFilletedDiskGeometry(coverRadius, diskThickness, diskFillet);
 
   const geos: THREE.BufferGeometry[] = [disk];
   for (let i = 0; i < CLIP_COUNT; i++) {
@@ -65,6 +67,39 @@ export function createDrywallPlugGeometries(design: DrywallPlugDesign): THREE.Bu
   }
 
   return geos;
+}
+
+const DISK_FILLET_SEGMENTS = 8;
+const DISK_RADIAL_SEGMENTS = 128;
+
+// A lathe-revolved profile (rather than a plain cylinder) so the rounded
+// edge is one continuous surface of revolution — no separate solid to weld
+// against the flat faces, so there's nothing for it to be non-manifold with.
+function createFilletedDiskGeometry(radius: number, thickness: number, fillet: number): THREE.BufferGeometry {
+  const halfT = thickness / 2;
+  const points: THREE.Vector2[] = [new THREE.Vector2(0, -halfT)];
+
+  if (fillet > 0.001) {
+    const bottomCenter = new THREE.Vector2(radius - fillet, -halfT + fillet);
+    const topCenter = new THREE.Vector2(radius - fillet, halfT - fillet);
+    for (let i = 0; i <= DISK_FILLET_SEGMENTS; i++) {
+      const a = -Math.PI / 2 + (Math.PI / 2) * (i / DISK_FILLET_SEGMENTS);
+      points.push(new THREE.Vector2(bottomCenter.x + fillet * Math.cos(a), bottomCenter.y + fillet * Math.sin(a)));
+    }
+    for (let i = 0; i <= DISK_FILLET_SEGMENTS; i++) {
+      const a = (Math.PI / 2) * (i / DISK_FILLET_SEGMENTS);
+      points.push(new THREE.Vector2(topCenter.x + fillet * Math.cos(a), topCenter.y + fillet * Math.sin(a)));
+    }
+  } else {
+    points.push(new THREE.Vector2(radius, -halfT));
+    points.push(new THREE.Vector2(radius, halfT));
+  }
+
+  points.push(new THREE.Vector2(0, halfT));
+
+  const geo = new THREE.LatheGeometry(points, DISK_RADIAL_SEGMENTS);
+  geo.rotateX(Math.PI / 2); // Lathe revolves around Y by default; align it to Z like the rest of the model
+  return geo;
 }
 
 const CLIP_ARC_SEGMENTS = 6;
@@ -188,6 +223,13 @@ export function validateDrywallPlug(
   }
   if (design.diskThicknessMm < 1) {
     warnings.push({ id: "disk-thickness", severity: "warning", message: "Disk under 1mm may be too fragile to hold the clips." });
+  }
+  if (design.diskFilletMm < 0) {
+    warnings.push({ id: "disk-fillet-value", severity: "error", message: "Disk fillet can't be negative." });
+  }
+  const maxDiskFillet = Math.min(design.diskThicknessMm / 2, design.coverDiameterMm / 2 * 0.4);
+  if (design.diskFilletMm > maxDiskFillet) {
+    warnings.push({ id: "disk-fillet", severity: "warning", message: `Disk fillet is clamped to ${round(maxDiskFillet)}mm for this disk size.` });
   }
   // Clips are arcs of the hole circumference, spaced 90° apart; they'd touch once
   // each one's half-angle reaches 45° (width/2/holeRadius = pi/4).

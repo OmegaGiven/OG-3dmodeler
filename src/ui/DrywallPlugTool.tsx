@@ -129,6 +129,17 @@ export function DrywallPlugTool() {
         </label>
 
         <label>
+          <FieldLabel icon={<Ruler size={18} />} title="Disk edge fillet" />
+          <input
+            type="number"
+            min="0"
+            step={minStep}
+            value={displayMm(plug.diskFilletMm)}
+            onChange={(e) => updatePlug({ diskFilletMm: Math.max(0, inputToMm(Number(e.target.value))) })}
+          />
+        </label>
+
+        <label>
           <FieldLabel icon={<MoveVertical size={18} />} title="Clip width" />
           <input
             type="number"
