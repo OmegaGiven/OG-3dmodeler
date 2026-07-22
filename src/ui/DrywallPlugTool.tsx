@@ -117,6 +117,17 @@ export function DrywallPlugTool() {
         </label>
 
         <label>
+          <FieldLabel icon={<MoveVertical size={18} />} title="Disk thickness" />
+          <input
+            type="number"
+            min={minStep}
+            step={minStep}
+            value={displayMm(plug.diskThicknessMm)}
+            onChange={(e) => updatePlug({ diskThicknessMm: inputToMm(Number(e.target.value)) })}
+          />
+        </label>
+
+        <label>
           <FieldLabel icon={<MoveVertical size={18} />} title="Clip width" />
           <input
             type="number"

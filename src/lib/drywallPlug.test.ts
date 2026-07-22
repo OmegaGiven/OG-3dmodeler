@@ -47,6 +47,8 @@ const cases: Array<[string, DrywallPlugDesign]> = [
   ["small hole", { ...base, coverDiameterMm: 40, holeDiameterMm: 20, clipWidthMm: 6 }],
   ["no barb protrusion", { ...base, barbProtrusionMm: 0 }],
   ["wide clips", { ...base, clipWidthMm: 14 }],
+  ["thin disk", { ...base, diskThicknessMm: 2 }],
+  ["thick disk", { ...base, diskThicknessMm: 8 }],
 ];
 
 describe("drywall plug STL is watertight (0 open edges)", () => {
