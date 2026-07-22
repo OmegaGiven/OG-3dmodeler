@@ -35,8 +35,9 @@ export function createInitialDrywallPlugDesign(): DrywallPlugDesign {
 }
 
 export function drywallPlugSizeLabel(design: DrywallPlugDesign): string {
-  const totalDepth =
-    design.diskThicknessMm + design.drywallThicknessMm + design.barbLengthMm + clipLeadInRunMm(design.clipWidthMm);
+  // Total clip length: shoulder + barb rise + an equal-length, equal-slope run
+  // back down past the hole radius to a pointed tip.
+  const totalDepth = design.diskThicknessMm + design.drywallThicknessMm + design.barbLengthMm * 2;
   return `${round(design.coverDiameterMm)}mm cover x ${round(design.holeDiameterMm)}mm hole · ${round(totalDepth)}mm deep`;
 }
 
@@ -102,13 +103,6 @@ function createFilletedDiskGeometry(radius: number, thickness: number, fillet: n
 
 const CLIP_ARC_SEGMENTS = 6;
 
-// The tip taper's run (its axial length) is set to the clip's own width, so the
-// ramp's angle — atan(barbProtrusion / run) — is always at least as shallow as
-// a 45° wedge across the clip, regardless of how short barbLengthMm is.
-export function clipLeadInRunMm(clipWidthMm: number): number {
-  return Math.max(1, clipWidthMm);
-}
-
 function createClipGeometry(
   angle: number,
   holeRadius: number,
@@ -132,16 +126,18 @@ function createClipGeometry(
     return points;
   };
 
-  const leadInRun = clipLeadInRunMm(width);
-
   const backZ = -diskThickness / 2;
   const ringZ = [
     backZ + WELD_OVERLAP_MM, // embedded slightly into the disk for real volumetric overlap
     backZ - drywallThickness, // shoulder: end of the straight, hole-width friction-fit section
     backZ - drywallThickness - barbLength, // peak: widest point, barbLength past the shoulder
-    backZ - drywallThickness - barbLength - leadInRun, // tip: tapers back to hole width over a shallow run
+    backZ - drywallThickness - barbLength * 2, // tip: same slope continued past the peak, same run length
   ];
-  const ringOuter = [holeRadius, holeRadius, holeRadius + barbProtrusion, holeRadius];
+  // Tip continues the same rise/run slope past the peak instead of reversing it,
+  // ending up as far below holeRadius as the peak sits above it — a pointed end,
+  // not just a return to flush.
+  const tipRadius = Math.max(innerRadius + 0.2, holeRadius - barbProtrusion);
+  const ringOuter = [holeRadius, holeRadius, holeRadius + barbProtrusion, tipRadius];
 
   const rings = ringZ.map((z, i) => ({
     outer: arc(ringOuter[i], z),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clipLeadInRunMm, createDrywallPlugGeometries, createInitialDrywallPlugDesign, DrywallPlugDesign, drywallPlugToAsciiStl } from "./drywallPlug";
+import { createDrywallPlugGeometries, createInitialDrywallPlugDesign, DrywallPlugDesign, drywallPlugToAsciiStl } from "./drywallPlug";
 import * as THREE from "three";
 
 function countOpenEdges(asciiStl: string): number {
@@ -99,8 +99,8 @@ describe("drywall plug disk fillet only rounds the outward-facing edge", () => {
   });
 });
 
-describe("clip barb tapers back down at the tip for an easy lead-in", () => {
-  it("tip radius is back near the hole width, not stuck at max protrusion", () => {
+describe("clip barb tapers to a pointed tip past the peak", () => {
+  it("tip radius sits as far below hole radius as the peak sits above it, same slope", () => {
     const design = { ...base, barbProtrusionMm: 2 };
     const geos = createDrywallPlugGeometries(design);
     const clip = geos[1]; // geos[0] is the disk
@@ -123,12 +123,14 @@ describe("clip barb tapers back down at the tip for an easy lead-in", () => {
 
     // Peak (mid-barb) should reach the full protruded radius somewhere in the geometry...
     expect(maxRadiusOverall).toBeGreaterThan(holeRadius + design.barbProtrusionMm - 0.1);
-    // ...but the tip itself should have tapered back down near the hole radius, well under the peak.
-    // The taper's run (axial length from peak to tip) should be at least the clip's own
-    // width, so the ramp angle stays shallow regardless of how short barbLengthMm is.
+    // ...and the tip should have narrowed back down BELOW hole radius (pointed), not
+    // just returned to flush — same magnitude drop as the peak's rise, same slope.
+    expect(maxRadiusAtTip).toBeLessThan(holeRadius - design.barbProtrusionMm + 0.3);
+
+    // Total clip depth should include the full symmetric run: shoulder + barb rise +
+    // an equal-length run back down past the hole radius to the point.
     const totalClipDepth = -box.min.z; // clip runs from ~0 (disk back) to box.min.z (tip)
-    const expectedMinDepth = design.drywallThicknessMm + design.barbLengthMm + clipLeadInRunMm(design.clipWidthMm) - 0.5;
+    const expectedMinDepth = design.drywallThicknessMm + design.barbLengthMm * 2 - 0.5;
     expect(totalClipDepth).toBeGreaterThan(expectedMinDepth);
-    expect(maxRadiusAtTip).toBeLessThan(holeRadius + 0.1);
   });
 });
