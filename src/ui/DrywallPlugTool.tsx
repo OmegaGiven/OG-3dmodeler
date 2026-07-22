@@ -1,5 +1,5 @@
 import { ReactNode, useMemo, useState } from "react";
-import { Circle, Download, MoveVertical, Ruler } from "lucide-react";
+import { Circle, Download, MoveHorizontal, MoveVertical, Ruler } from "lucide-react";
 import { downloadText, safeName } from "../lib/export2d";
 import {
   createDrywallPlugGeometries,
@@ -136,6 +136,17 @@ export function DrywallPlugTool() {
             step={minStep}
             value={displayMm(plug.clipWidthMm)}
             onChange={(e) => updatePlug({ clipWidthMm: inputToMm(Number(e.target.value)) })}
+          />
+        </label>
+
+        <label>
+          <FieldLabel icon={<MoveHorizontal size={18} />} title="Clip thickness" />
+          <input
+            type="number"
+            min={minStep}
+            step={minStep}
+            value={displayMm(plug.clipThicknessMm)}
+            onChange={(e) => updatePlug({ clipThicknessMm: inputToMm(Number(e.target.value)) })}
           />
         </label>
 

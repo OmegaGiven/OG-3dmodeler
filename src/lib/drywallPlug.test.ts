@@ -49,6 +49,8 @@ const cases: Array<[string, DrywallPlugDesign]> = [
   ["wide clips", { ...base, clipWidthMm: 14 }],
   ["thin disk", { ...base, diskThicknessMm: 2 }],
   ["thick disk", { ...base, diskThicknessMm: 8 }],
+  ["thin clips", { ...base, clipThicknessMm: 2 }],
+  ["thick clips", { ...base, clipThicknessMm: 8 }],
 ];
 
 describe("drywall plug STL is watertight (0 open edges)", () => {

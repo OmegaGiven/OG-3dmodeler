@@ -8,14 +8,12 @@ export interface DrywallPlugDesign {
   drywallThicknessMm: number;
   diskThicknessMm: number;
   clipWidthMm: number;
+  clipThicknessMm: number;
   barbLengthMm: number;
   barbProtrusionMm: number;
   nozzleDiameterMm: number;
 }
 
-// Fixed per spec: the clip blades are 5mm of radial material, independent of
-// how thick the disk is set to.
-const CLIP_RADIAL_THICKNESS_MM = 5;
 const CLIP_COUNT = 4;
 const WELD_OVERLAP_MM = 0.02;
 
@@ -27,6 +25,7 @@ export function createInitialDrywallPlugDesign(): DrywallPlugDesign {
     drywallThicknessMm: 12.7,
     diskThicknessMm: 5,
     clipWidthMm: 10,
+    clipThicknessMm: 5,
     barbLengthMm: 3,
     barbProtrusionMm: 1.5,
     nozzleDiameterMm: 0.4,
@@ -44,9 +43,10 @@ export function createDrywallPlugGeometries(design: DrywallPlugDesign): THREE.Bu
   const diskThickness = Math.max(0.5, design.diskThicknessMm);
   const drywallThickness = Math.max(0.5, design.drywallThicknessMm);
   const clipWidth = Math.max(1, design.clipWidthMm);
+  const clipThickness = Math.max(0.5, design.clipThicknessMm);
   const barbLength = Math.max(0.5, design.barbLengthMm);
   const barbProtrusion = Math.max(0, design.barbProtrusionMm);
-  const clipInnerRadius = Math.max(0.2, holeRadius - CLIP_RADIAL_THICKNESS_MM);
+  const clipInnerRadius = Math.max(0.2, holeRadius - clipThickness);
 
   const disk = new THREE.CylinderGeometry(coverRadius, coverRadius, diskThickness, 128);
   disk.rotateX(Math.PI / 2); // cylinder's default axis is Y; align it to Z
@@ -177,8 +177,11 @@ export function validateDrywallPlug(
   if ((design.coverDiameterMm - design.holeDiameterMm) / 2 < 3) {
     warnings.push({ id: "cover-margin", severity: "warning", message: "Less than 3mm of cover overlaps the wall around the hole — may not seat securely." });
   }
-  if (holeRadius - CLIP_RADIAL_THICKNESS_MM < 1) {
-    warnings.push({ id: "clip-thickness", severity: "error", message: "Hole diameter is too small for 5mm-thick clips — increase hole diameter." });
+  if (design.clipThicknessMm <= 0) {
+    warnings.push({ id: "clip-thickness-value", severity: "error", message: "Clip thickness must be greater than 0mm." });
+  }
+  if (holeRadius - design.clipThicknessMm < 1) {
+    warnings.push({ id: "clip-thickness", severity: "error", message: `Hole diameter is too small for ${round(design.clipThicknessMm)}mm-thick clips — increase hole diameter or reduce clip thickness.` });
   }
   if (design.drywallThicknessMm <= 0) {
     warnings.push({ id: "drywall-thickness", severity: "error", message: "Drywall thickness must be greater than 0mm." });
@@ -195,7 +198,7 @@ export function validateDrywallPlug(
   if (design.barbProtrusionMm <= 0) {
     warnings.push({ id: "barb", severity: "warning", message: "No barb protrusion — clips will rely on friction alone to hold the disk in." });
   }
-  if (design.nozzleDiameterMm > CLIP_RADIAL_THICKNESS_MM) {
+  if (design.nozzleDiameterMm > design.clipThicknessMm) {
     warnings.push({ id: "nozzle", severity: "warning", message: "Nozzle diameter is larger than the clip thickness and may not print clips cleanly." });
   }
 
