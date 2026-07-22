@@ -35,7 +35,8 @@ export function createInitialDrywallPlugDesign(): DrywallPlugDesign {
 }
 
 export function drywallPlugSizeLabel(design: DrywallPlugDesign): string {
-  const totalDepth = design.diskThicknessMm + design.drywallThicknessMm + design.barbLengthMm;
+  const totalDepth =
+    design.diskThicknessMm + design.drywallThicknessMm + design.barbLengthMm + clipLeadInRunMm(design.clipWidthMm);
   return `${round(design.coverDiameterMm)}mm cover x ${round(design.holeDiameterMm)}mm hole · ${round(totalDepth)}mm deep`;
 }
 
@@ -101,6 +102,13 @@ function createFilletedDiskGeometry(radius: number, thickness: number, fillet: n
 
 const CLIP_ARC_SEGMENTS = 6;
 
+// The tip taper's run (its axial length) is set to the clip's own width, so the
+// ramp's angle — atan(barbProtrusion / run) — is always at least as shallow as
+// a 45° wedge across the clip, regardless of how short barbLengthMm is.
+export function clipLeadInRunMm(clipWidthMm: number): number {
+  return Math.max(1, clipWidthMm);
+}
+
 function createClipGeometry(
   angle: number,
   holeRadius: number,
@@ -124,12 +132,14 @@ function createClipGeometry(
     return points;
   };
 
+  const leadInRun = clipLeadInRunMm(width);
+
   const backZ = -diskThickness / 2;
   const ringZ = [
     backZ + WELD_OVERLAP_MM, // embedded slightly into the disk for real volumetric overlap
     backZ - drywallThickness, // shoulder: end of the straight, hole-width friction-fit section
-    backZ - drywallThickness - barbLength / 2, // peak: widest point, mid-barb
-    backZ - drywallThickness - barbLength, // tip: narrows back to hole width for an easy lead-in
+    backZ - drywallThickness - barbLength, // peak: widest point, barbLength past the shoulder
+    backZ - drywallThickness - barbLength - leadInRun, // tip: tapers back to hole width over a shallow run
   ];
   const ringOuter = [holeRadius, holeRadius, holeRadius + barbProtrusion, holeRadius];
 

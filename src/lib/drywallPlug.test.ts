@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDrywallPlugGeometries, createInitialDrywallPlugDesign, DrywallPlugDesign, drywallPlugToAsciiStl } from "./drywallPlug";
+import { clipLeadInRunMm, createDrywallPlugGeometries, createInitialDrywallPlugDesign, DrywallPlugDesign, drywallPlugToAsciiStl } from "./drywallPlug";
 import * as THREE from "three";
 
 function countOpenEdges(asciiStl: string): number {
@@ -124,6 +124,11 @@ describe("clip barb tapers back down at the tip for an easy lead-in", () => {
     // Peak (mid-barb) should reach the full protruded radius somewhere in the geometry...
     expect(maxRadiusOverall).toBeGreaterThan(holeRadius + design.barbProtrusionMm - 0.1);
     // ...but the tip itself should have tapered back down near the hole radius, well under the peak.
+    // The taper's run (axial length from peak to tip) should be at least the clip's own
+    // width, so the ramp angle stays shallow regardless of how short barbLengthMm is.
+    const totalClipDepth = -box.min.z; // clip runs from ~0 (disk back) to box.min.z (tip)
+    const expectedMinDepth = design.drywallThicknessMm + design.barbLengthMm + clipLeadInRunMm(design.clipWidthMm) - 0.5;
+    expect(totalClipDepth).toBeGreaterThan(expectedMinDepth);
     expect(maxRadiusAtTip).toBeLessThan(holeRadius + 0.1);
   });
 });
