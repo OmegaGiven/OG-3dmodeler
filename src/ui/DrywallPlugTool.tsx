@@ -12,6 +12,7 @@ import {
 } from "../lib/drywallPlug";
 import { inchesToMm, mmToInches } from "../shared/design";
 import { GeometryPreview } from "./GeometryPreview";
+import { TemplateActions } from "./TemplateActions";
 
 export function DrywallPlugTool() {
   const [plug, setPlug] = useState<DrywallPlugDesign>(() => createInitialDrywallPlugDesign());
@@ -182,6 +183,13 @@ export function DrywallPlugTool() {
           <Download size={20} />
           <span>Export STEP</span>
         </button>
+        <TemplateActions
+          kind="og-3dmodeler-drywall-plug"
+          design={plug}
+          base={createInitialDrywallPlugDesign()}
+          onLoad={setPlug}
+          onStatus={setStatus}
+        />
       </div>
 
       <div className="export-warnings">

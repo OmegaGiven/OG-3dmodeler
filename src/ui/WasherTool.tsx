@@ -11,6 +11,7 @@ import {
 } from "../lib/washer";
 import { inchesToMm, mmToInches } from "../shared/design";
 import { GeometryPreview } from "./GeometryPreview";
+import { TemplateActions } from "./TemplateActions";
 
 export function WasherTool() {
   const [washer, setWasher] = useState<WasherDesign>(() => createInitialWasherDesign());
@@ -138,6 +139,13 @@ export function WasherTool() {
           <Download size={20} />
           <span>Export STEP</span>
         </button>
+        <TemplateActions
+          kind="og-3dmodeler-washer"
+          design={washer}
+          base={createInitialWasherDesign()}
+          onLoad={setWasher}
+          onStatus={setStatus}
+        />
       </div>
 
       <div className="export-warnings">

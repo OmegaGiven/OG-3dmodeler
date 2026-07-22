@@ -4,6 +4,7 @@ import { downloadText, safeName } from "../lib/export2d";
 import { createInitialLidDesign, LidDesign, lidSizeLabel, lidToAsciiStl, lidToStep } from "../lib/lid";
 import { inchesToMm, mmToInches } from "../shared/design";
 import { LidPreview } from "./LidPreview";
+import { TemplateActions } from "./TemplateActions";
 
 export function LidMakerTool() {
   const [lid, setLid] = useState<LidDesign>(() => createInitialLidDesign());
@@ -154,6 +155,14 @@ export function LidMakerTool() {
           <Download size={20} />
           <span>Export STEP</span>
         </button>
+        <TemplateActions
+          kind="og-3dmodeler-lid"
+          design={lid}
+          base={createInitialLidDesign()}
+          enums={{ shape: ["round", "square"], fit: ["inner", "outer"] }}
+          onLoad={setLid}
+          onStatus={setStatus}
+        />
       </div>
 
       <div className="export-warnings">
