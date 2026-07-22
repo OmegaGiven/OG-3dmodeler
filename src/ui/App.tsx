@@ -18,6 +18,7 @@ import {
   Save,
   Settings,
   CircleDot,
+  Disc,
   Plug,
   Type,
   Undo2,
@@ -49,6 +50,7 @@ import {
   pxToMm,
 } from "../shared/design";
 import { createId } from "../shared/id";
+import { DrywallPlugTool } from "./DrywallPlugTool";
 import { LidMakerTool } from "./LidMakerTool";
 import { OutletCoverTool } from "./OutletCoverTool";
 import { ThreePreview } from "./ThreePreview";
@@ -57,7 +59,7 @@ import { WasherTool } from "./WasherTool";
 const MAX_SCALE = 8;
 const MAX_HISTORY = 80;
 const FONTS = ["Inter", "Arial", "Georgia", "Courier New", "Trebuchet MS"];
-type ActiveTool = "business-card" | "lid-maker" | "washer" | "outlet-cover";
+type ActiveTool = "business-card" | "lid-maker" | "washer" | "outlet-cover" | "drywall-plug";
 
 interface DesignHistory {
   past: Design[];
@@ -464,6 +466,15 @@ export function App() {
     );
   }
 
+  if (activeTool === "drywall-plug") {
+    return (
+      <main className="mobile-shell">
+        <ToolNav activeTool={activeTool} selectTool={selectTool} />
+        <DrywallPlugTool />
+      </main>
+    );
+  }
+
   if (view === "export") {
     return (
       <ExportScreen
@@ -702,6 +713,10 @@ function ToolNav(props: { activeTool: ActiveTool; selectTool: (tool: ActiveTool)
       <button className={`tool-tab ${props.activeTool === "outlet-cover" ? "active" : ""}`} onClick={() => props.selectTool("outlet-cover")}>
         <Plug size={18} />
         <span>Outlets</span>
+      </button>
+      <button className={`tool-tab ${props.activeTool === "drywall-plug" ? "active" : ""}`} onClick={() => props.selectTool("drywall-plug")}>
+        <Disc size={18} />
+        <span>Plugs</span>
       </button>
     </nav>
   );
