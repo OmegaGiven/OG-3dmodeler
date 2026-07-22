@@ -488,19 +488,55 @@ function createFrontEdgeBevelRing(
     }
   }
 
-  // Back frame closes the outer strip at z=wt (needed when no wall ring is present)
+  // This shell only traces the OUTER profile (knife-edge front → full tw×th → back).
+  // Its inner boundary (the iw×ih hole where frontGeo's solid sits) was previously left
+  // as two bare, unpaired edge loops (front rim + back-frame inner edge) with nothing in
+  // this mesh closing them — frontGeo touches them but is a separate watertight solid, so
+  // the loops stayed open ("8 open edges" in Bambu Studio) and its repair pass erased the
+  // nearby cutouts along with them. Give the shell its own inner wall, pulled slightly
+  // inside frontGeo's boundary for genuine volumetric overlap (same fix as the wall/plate
+  // seam below), so this geometry is a fully closed, independent solid.
   const lastZ = outerRings[outerRings.length - 1].z;
+  const iwIn = iw - 2 * WELD_OVERLAP_MM;
+  const ihIn = ih - 2 * WELD_OVERLAP_MM;
+  const innerAt = (z: number): Array<[number,number,number]> => [
+    [-iwIn/2,  ihIn/2, z], [ iwIn/2,  ihIn/2, z],
+    [ iwIn/2, -ihIn/2, z], [-iwIn/2, -ihIn/2, z],
+  ];
+  const rimAt = (z: number): Array<[number,number,number]> => [
+    [-iw/2,  ih/2, z], [ iw/2,  ih/2, z],
+    [ iw/2, -ih/2, z], [-iw/2, -ih/2, z],
+  ];
+
+  // Front knife-edge cap: bridges the true rim (matches ring 0) down to the inset inner wall.
+  const rim0 = rimAt(0);
+  const in0 = innerAt(0);
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    quad(rim0[i], rim0[j], in0[j], in0[i], false);
+  }
+
+  // Straight inner wall, full depth, facing inward (opposite winding of the outer shell).
+  const inWt = innerAt(wt);
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    quad(in0[i], in0[j], inWt[j], inWt[i], true);
+  }
+
+  // Back frame closes the outer strip at z=wt (needed when no wall ring is present),
+  // then bridges the true inner rim down to the inset inner wall, same as the front.
   const vO: Array<[number,number,number]> = [
     [-tw/2,  th/2, lastZ], [ tw/2,  th/2, lastZ],
     [ tw/2, -th/2, lastZ], [-tw/2, -th/2, lastZ],
   ];
-  const vI: Array<[number,number,number]> = [
-    [-iw/2,  ih/2, lastZ], [ iw/2,  ih/2, lastZ],
-    [ iw/2, -ih/2, lastZ], [-iw/2, -ih/2, lastZ],
-  ];
+  const vI = rimAt(lastZ);
   for (let i = 0; i < 4; i++) {
     const j = (i + 1) % 4;
     quad(vO[i], vO[j], vI[j], vI[i], true);
+  }
+  for (let i = 0; i < 4; i++) {
+    const j = (i + 1) % 4;
+    quad(vI[i], vI[j], inWt[j], inWt[i], false);
   }
 
   const geo = new THREE.BufferGeometry();
