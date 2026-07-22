@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInitialOutletCoverDesign, outletCoverToAsciiStl, OutletCoverDesign } from "./outletCover";
+import { createInitialOutletCoverDesign, duplexReceptacleHole, outletCoverToAsciiStl, OutletCoverDesign } from "./outletCover";
 
 function countOpenEdges(asciiStl: string): number {
   const lines = asciiStl.split("\n");
@@ -48,5 +48,24 @@ describe("outlet cover STL is watertight (0 open edges)", () => {
   it.each(cases)("%s", (_label, design) => {
     const stl = outletCoverToAsciiStl(design);
     expect(countOpenEdges(stl)).toBe(0);
+  });
+});
+
+describe("duplex receptacle hole bulges to full diameter, not a stadium", () => {
+  it("widest point reaches the full circle radius, not just the flat height", () => {
+    const diameter = 34.1;
+    const height = 28.6;
+    const path = duplexReceptacleHole(0, 0, diameter, height);
+    const points = path.getPoints();
+
+    const maxRadiusFromCenter = Math.max(...points.map((p) => Math.hypot(p.x, p.y)));
+    const maxAbsY = Math.max(...points.map((p) => Math.abs(p.y)));
+
+    // A stadium (old shape) would cap out at height/2 everywhere; this shape
+    // should bulge out to the full diameter/2 at its widest (near y=0).
+    expect(maxRadiusFromCenter).toBeGreaterThan(height / 2 + 1);
+    expect(maxRadiusFromCenter).toBeCloseTo(diameter / 2, 1);
+    // Vertical extent must still match the flat-to-flat height, unchanged.
+    expect(maxAbsY).toBeCloseTo(height / 2, 1);
   });
 });

@@ -156,11 +156,13 @@ export function createOutletCoverGeometries(design: OutletCoverDesign): THREE.Bu
   frontShape.closePath();
 
   if (outletType === "duplex") {
-    // Stadium (discorectangle): flat top/bottom, semicircular left/right ends
-    // r = ch/2 makes it a true stadium; clamp to cw/2 to never exceed half-width
-    const stadiumR = Math.min(ch / 2, cw / 2);
+    // Real duplex receptacle openings aren't a stadium (semicircular ends) —
+    // they're a circle of diameter cw with the top and bottom flattened off at
+    // height ch, so the sides stay fully round and bulge out wider than the
+    // flats. cutoutWidthMm is that circle's diameter, cutoutHeightMm is the
+    // flat-to-flat height.
     for (const yHole of [cy + ovalSpacingMm / 2, cy - ovalSpacingMm / 2]) {
-      frontShape.holes.push(roundedRectHole(cx, yHole, cw, ch, stadiumR));
+      frontShape.holes.push(duplexReceptacleHole(cx, yHole, cw, ch));
     }
     // Center screw anchored to the outlet receptacle center, not the plate center
     addScrewHole(frontShape, cx, cy, design.screwHoleDiameterMm);
@@ -549,6 +551,44 @@ function roundedRectHole(cx: number, cy: number, w: number, h: number, r: number
     addPt(cx - w / 2 + r + r * Math.cos(a), cy + h / 2 - r + r * Math.sin(a));
   }
   addPt(cx - w / 2 + r, cy + h / 2); // close back to start
+
+  const path = new THREE.Path();
+  path.setFromPoints(pts);
+  return path;
+}
+
+// Circle of diameter `diameterMm`, flattened by a horizontal chord top and
+// bottom at ±heightMm/2 — the actual shape of a single duplex receptacle
+// opening (per published wall-plate cutout specs), not a stadium.
+export function duplexReceptacleHole(cx: number, cy: number, diameterMm: number, heightMm: number): THREE.Path {
+  const R = diameterMm / 2;
+  const halfH = Math.min(heightMm / 2, R - 0.01);
+  const phi = Math.asin(halfH / R);
+  const flatHalfWidth = R * Math.cos(phi);
+
+  const segs = Math.max(4, Math.ceil(R * (2 * phi)));
+
+  const pts: THREE.Vector2[] = [];
+  const addPt = (x: number, y: number) => {
+    const last = pts[pts.length - 1];
+    if (!last || Math.abs(last.x - x) > 1e-6 || Math.abs(last.y - y) > 1e-6) {
+      pts.push(new THREE.Vector2(x, y));
+    }
+  };
+
+  // CW winding: top-left → top-right (flat) → arc down the right side → bottom-right
+  // → bottom-left (flat) → arc up the left side → back to top-left.
+  addPt(cx - flatHalfWidth, cy + halfH);
+  addPt(cx + flatHalfWidth, cy + halfH);
+  for (let i = 1; i <= segs; i++) {
+    const a = phi - 2 * phi * (i / segs); // phi → -phi (CW, through angle 0 / rightmost point)
+    addPt(cx + R * Math.cos(a), cy + R * Math.sin(a));
+  }
+  addPt(cx - flatHalfWidth, cy - halfH);
+  for (let i = 1; i <= segs; i++) {
+    const a = (Math.PI + phi) - 2 * phi * (i / segs); // pi+phi → pi-phi (CW, through angle pi / leftmost point)
+    addPt(cx + R * Math.cos(a), cy + R * Math.sin(a));
+  }
 
   const path = new THREE.Path();
   path.setFromPoints(pts);
