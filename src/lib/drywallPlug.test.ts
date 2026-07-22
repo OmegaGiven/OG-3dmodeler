@@ -71,3 +71,30 @@ describe("drywall plug solids are right-side-out", () => {
     }
   });
 });
+
+describe("drywall plug disk fillet only rounds the outward-facing edge", () => {
+  it("back edge (where clips attach) stays sharp at full radius", () => {
+    const design = { ...base, diskFilletMm: 2 };
+    const [disk] = createDrywallPlugGeometries(design);
+    disk.computeBoundingBox();
+    const box = disk.boundingBox!;
+    const coverRadius = design.coverDiameterMm / 2;
+    const pos = disk.attributes.position;
+
+    // The back face (z = min, where clips attach) should still reach full
+    // radius — only the front (z = max) should be pulled in by the fillet.
+    let maxRadiusAtBack = 0;
+    let maxRadiusAtFront = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + y * y);
+      if (Math.abs(z - box.min.z) < 0.01) maxRadiusAtBack = Math.max(maxRadiusAtBack, r);
+      if (Math.abs(z - box.max.z) < 0.01) maxRadiusAtFront = Math.max(maxRadiusAtFront, r);
+    }
+
+    expect(maxRadiusAtBack).toBeGreaterThan(coverRadius - 0.1);
+    expect(maxRadiusAtFront).toBeLessThan(coverRadius - 1);
+  });
+});

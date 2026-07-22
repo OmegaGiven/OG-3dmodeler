@@ -75,23 +75,20 @@ const DISK_RADIAL_SEGMENTS = 128;
 // A lathe-revolved profile (rather than a plain cylinder) so the rounded
 // edge is one continuous surface of revolution — no separate solid to weld
 // against the flat faces, so there's nothing for it to be non-manifold with.
+// Only the front (outward-facing, y=+halfT before rotateX) edge is rounded —
+// the back edge stays sharp since that side sits flush against the wall.
 function createFilletedDiskGeometry(radius: number, thickness: number, fillet: number): THREE.BufferGeometry {
   const halfT = thickness / 2;
-  const points: THREE.Vector2[] = [new THREE.Vector2(0, -halfT)];
+  const points: THREE.Vector2[] = [new THREE.Vector2(0, -halfT), new THREE.Vector2(radius, -halfT)];
 
   if (fillet > 0.001) {
-    const bottomCenter = new THREE.Vector2(radius - fillet, -halfT + fillet);
     const topCenter = new THREE.Vector2(radius - fillet, halfT - fillet);
-    for (let i = 0; i <= DISK_FILLET_SEGMENTS; i++) {
-      const a = -Math.PI / 2 + (Math.PI / 2) * (i / DISK_FILLET_SEGMENTS);
-      points.push(new THREE.Vector2(bottomCenter.x + fillet * Math.cos(a), bottomCenter.y + fillet * Math.sin(a)));
-    }
+    points.push(new THREE.Vector2(radius, halfT - fillet));
     for (let i = 0; i <= DISK_FILLET_SEGMENTS; i++) {
       const a = (Math.PI / 2) * (i / DISK_FILLET_SEGMENTS);
       points.push(new THREE.Vector2(topCenter.x + fillet * Math.cos(a), topCenter.y + fillet * Math.sin(a)));
     }
   } else {
-    points.push(new THREE.Vector2(radius, -halfT));
     points.push(new THREE.Vector2(radius, halfT));
   }
 
