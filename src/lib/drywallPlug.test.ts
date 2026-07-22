@@ -98,3 +98,32 @@ describe("drywall plug disk fillet only rounds the outward-facing edge", () => {
     expect(maxRadiusAtFront).toBeLessThan(coverRadius - 1);
   });
 });
+
+describe("clip barb tapers back down at the tip for an easy lead-in", () => {
+  it("tip radius is back near the hole width, not stuck at max protrusion", () => {
+    const design = { ...base, barbProtrusionMm: 2 };
+    const geos = createDrywallPlugGeometries(design);
+    const clip = geos[1]; // geos[0] is the disk
+    clip.computeBoundingBox();
+    const box = clip.boundingBox!;
+    const holeRadius = design.holeDiameterMm / 2;
+    const pos = clip.attributes.position;
+
+    // The tip is the most-negative-z end (furthest from the disk, leading edge on insertion).
+    let maxRadiusAtTip = 0;
+    let maxRadiusOverall = 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      const r = Math.sqrt(x * x + y * y);
+      maxRadiusOverall = Math.max(maxRadiusOverall, r);
+      if (Math.abs(z - box.min.z) < 0.01) maxRadiusAtTip = Math.max(maxRadiusAtTip, r);
+    }
+
+    // Peak (mid-barb) should reach the full protruded radius somewhere in the geometry...
+    expect(maxRadiusOverall).toBeGreaterThan(holeRadius + design.barbProtrusionMm - 0.1);
+    // ...but the tip itself should have tapered back down near the hole radius, well under the peak.
+    expect(maxRadiusAtTip).toBeLessThan(holeRadius + 0.1);
+  });
+});

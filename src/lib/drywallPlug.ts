@@ -128,9 +128,10 @@ function createClipGeometry(
   const ringZ = [
     backZ + WELD_OVERLAP_MM, // embedded slightly into the disk for real volumetric overlap
     backZ - drywallThickness, // shoulder: end of the straight, hole-width friction-fit section
-    backZ - drywallThickness - barbLength, // tip: flared out by barbProtrusion
+    backZ - drywallThickness - barbLength / 2, // peak: widest point, mid-barb
+    backZ - drywallThickness - barbLength, // tip: narrows back to hole width for an easy lead-in
   ];
-  const ringOuter = [holeRadius, holeRadius, holeRadius + barbProtrusion];
+  const ringOuter = [holeRadius, holeRadius, holeRadius + barbProtrusion, holeRadius];
 
   const rings = ringZ.map((z, i) => ({
     outer: arc(ringOuter[i], z),
