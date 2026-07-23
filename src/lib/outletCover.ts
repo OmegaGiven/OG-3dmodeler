@@ -18,6 +18,8 @@ export interface OutletCoverDesign {
   depthMm: number;
   thicknessMm: number;
   screwHoleDiameterMm: number;
+  screwHeadDiameterMm: number;
+  screwHeadDepthMm: number;
   nozzleDiameterMm: number;
   toleranceMm: number;
   bevelType: BevelType;
@@ -52,7 +54,13 @@ export function createInitialOutletCoverDesign(): OutletCoverDesign {
     marginRightMm: DUPLEX_MARGIN_LR,
     depthMm: 0,
     thicknessMm: 3,
+    // Standard wall-plate mounting screw is a #6-32 oval head: shank ~3.5mm,
+    // head diameter up to ~7.1mm (ANSI B18.6.3, 82° oval/flat head), head
+    // height ~2.7-3.3mm. screwHeadDiameterMm/DepthMm size a counterbore so
+    // the head seats recessed like on a normal outlet cover.
     screwHoleDiameterMm: 3.5,
+    screwHeadDiameterMm: 7.5,
+    screwHeadDepthMm: 2.5,
     nozzleDiameterMm: 0.4,
     toleranceMm: 0.4,
     bevelType: "none",
@@ -147,41 +155,71 @@ export function createOutletCoverGeometries(design: OutletCoverDesign): THREE.Bu
     ? Math.min(design.bevelSizeMm, wt * 0.9, tw / 2 - 1, th / 2 - 1)
     : 0;
 
-  // Face plate outer boundary is shrunk by bs so the bevel ring covers the outer perimeter
-  const frontShape = new THREE.Shape();
-  frontShape.moveTo(-(tw / 2 - bs), -(th / 2 - bs));
-  frontShape.lineTo( (tw / 2 - bs), -(th / 2 - bs));
-  frontShape.lineTo( (tw / 2 - bs),  (th / 2 - bs));
-  frontShape.lineTo(-(tw / 2 - bs),  (th / 2 - bs));
-  frontShape.closePath();
+  // Screw positions, anchored to the outlet receptacle center, not the plate center
+  const screwCenters: Array<[number, number]> =
+    outletType === "duplex"
+      ? [[cx, cy]]
+      : (() => {
+          const sy = DECORA_SCREW_SPACING_MM / 2;
+          return [[cx, cy + sy], [cx, cy - sy]];
+        })();
 
-  if (outletType === "duplex") {
-    // Real duplex receptacle openings aren't a stadium (semicircular ends) —
-    // they're a circle of diameter cw with the top and bottom flattened off at
-    // height ch, so the sides stay fully round and bulge out wider than the
-    // flats. cutoutWidthMm is that circle's diameter, cutoutHeightMm is the
-    // flat-to-flat height.
-    for (const yHole of [cy + ovalSpacingMm / 2, cy - ovalSpacingMm / 2]) {
-      frontShape.holes.push(duplexReceptacleHole(cx, yHole, cw, ch));
+  // Face plate outer boundary is shrunk by bs so the bevel ring covers the outer perimeter
+  function buildFrontShape(screwHoleDiameterMm: number): THREE.Shape {
+    const shape = new THREE.Shape();
+    shape.moveTo(-(tw / 2 - bs), -(th / 2 - bs));
+    shape.lineTo( (tw / 2 - bs), -(th / 2 - bs));
+    shape.lineTo( (tw / 2 - bs),  (th / 2 - bs));
+    shape.lineTo(-(tw / 2 - bs),  (th / 2 - bs));
+    shape.closePath();
+
+    if (outletType === "duplex") {
+      // Real duplex receptacle openings aren't a stadium (semicircular ends) —
+      // they're a circle of diameter cw with the top and bottom flattened off at
+      // height ch, so the sides stay fully round and bulge out wider than the
+      // flats. cutoutWidthMm is that circle's diameter, cutoutHeightMm is the
+      // flat-to-flat height.
+      for (const yHole of [cy + ovalSpacingMm / 2, cy - ovalSpacingMm / 2]) {
+        shape.holes.push(duplexReceptacleHole(cx, yHole, cw, ch));
+      }
+    } else {
+      const r = Math.min(Math.max(0.5, cornerRadiusMm), cw / 2, ch / 2);
+      shape.holes.push(roundedRectHole(cx, cy, cw, ch, r));
     }
-    // Center screw anchored to the outlet receptacle center, not the plate center
-    addScrewHole(frontShape, cx, cy, design.screwHoleDiameterMm);
-  } else {
-    const r = Math.min(Math.max(0.5, cornerRadiusMm), cw / 2, ch / 2);
-    frontShape.holes.push(roundedRectHole(cx, cy, cw, ch, r));
-    // Two screw holes anchored to the outlet receptacle center, not the plate center
-    const sy = DECORA_SCREW_SPACING_MM / 2;
-    addScrewHole(frontShape, cx, cy + sy, design.screwHoleDiameterMm);
-    addScrewHole(frontShape, cx, cy - sy, design.screwHoleDiameterMm);
+    for (const [sx, sy] of screwCenters) {
+      addScrewHole(shape, sx, sy, screwHoleDiameterMm);
+    }
+    return shape;
   }
 
-  const frontGeo = new THREE.ExtrudeGeometry(frontShape, {
-    depth: wt,
-    bevelEnabled: false,
-    curveSegments: 64,
-  });
+  const geos: THREE.BufferGeometry[] = [];
 
-  const geos: THREE.BufferGeometry[] = [frontGeo];
+  // Screw head counterbore: a wider, shallower recess up front so a standard
+  // wall-plate screw's head seats flush instead of proud of the surface. Built
+  // as its own stacked slab (wide screw holes) welded onto the rest of the
+  // plate (normal-diameter screw holes) rather than a single variable-diameter
+  // hole, since ExtrudeGeometry only supports one constant cross-section.
+  const counterboreDepth = Math.min(Math.max(0, design.screwHeadDepthMm), wt - 0.4);
+  if (counterboreDepth > 0.05 && design.screwHeadDiameterMm > design.screwHoleDiameterMm) {
+    const counterboreGeo = new THREE.ExtrudeGeometry(buildFrontShape(design.screwHeadDiameterMm), {
+      depth: counterboreDepth + WELD_OVERLAP_MM,
+      bevelEnabled: false,
+      curveSegments: 64,
+    });
+    const restGeo = new THREE.ExtrudeGeometry(buildFrontShape(design.screwHoleDiameterMm), {
+      depth: wt - counterboreDepth,
+      bevelEnabled: false,
+      curveSegments: 64,
+    });
+    restGeo.translate(0, 0, counterboreDepth);
+    geos.push(counterboreGeo, restGeo);
+  } else {
+    geos.push(new THREE.ExtrudeGeometry(buildFrontShape(design.screwHoleDiameterMm), {
+      depth: wt,
+      bevelEnabled: false,
+      curveSegments: 64,
+    }));
+  }
 
   if (bs > 0) {
     geos.push(createFrontEdgeBevelRing(tw, th, bs, wt, design.bevelType));
@@ -289,6 +327,19 @@ export function validateOutletCover(
     if (Math.abs(cy) + sy + sr > heightMm / 2)
       warnings.push({ id: "screw-oob", severity: "error", message: "Decora screw holes extend outside plate — increase top/bottom margins." });
   }
+
+  if (design.screwHeadDepthMm > 0 && design.screwHeadDiameterMm <= design.screwHoleDiameterMm)
+    warnings.push({
+      id: "screw-head-diameter",
+      severity: "warning",
+      message: "Screw head diameter must exceed the shaft hole diameter — no counterbore will appear.",
+    });
+  if (design.screwHeadDepthMm >= design.thicknessMm)
+    warnings.push({
+      id: "screw-head-depth",
+      severity: "warning",
+      message: "Screw head recess depth is clamped to stay under the plate thickness.",
+    });
 
   return warnings;
 }

@@ -42,6 +42,13 @@ const cases: Array<[string, OutletCoverDesign]> = [
       bevelType: "fillet", bevelSizeMm: 1.5, depthMm: 5,
     },
   ],
+  ["duplex, no screw head counterbore", { ...base, screwHeadDepthMm: 0 }],
+  ["duplex, deep screw head counterbore (clamped)", { ...base, screwHeadDepthMm: 10 }],
+  ["duplex, screw head counterbore + wall depth + bevel", { ...base, depthMm: 8, bevelType: "chamfer", bevelSizeMm: 1 }],
+  [
+    "decora, screw head counterbore",
+    { ...base, outletType: "decora", cutoutWidthMm: 45.2, cutoutHeightMm: 70.6 },
+  ],
 ];
 
 describe("outlet cover STL is watertight (0 open edges)", () => {

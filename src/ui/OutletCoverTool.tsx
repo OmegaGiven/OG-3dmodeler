@@ -258,6 +258,28 @@ export function OutletCoverTool() {
         </label>
 
         <label>
+          <FieldLabel icon={<Ruler size={18} />} title="Screw head diameter" />
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={displayMm(cover.screwHeadDiameterMm)}
+            onChange={(e) => updateCover({ screwHeadDiameterMm: inputToMm(Number(e.target.value)) })}
+          />
+        </label>
+
+        <label>
+          <FieldLabel icon={<MoveVertical size={18} />} title="Screw head recess depth" />
+          <input
+            type="number"
+            min="0"
+            step={minStep}
+            value={displayMm(cover.screwHeadDepthMm)}
+            onChange={(e) => updateCover({ screwHeadDepthMm: Math.max(0, inputToMm(Number(e.target.value))) })}
+          />
+        </label>
+
+        <label>
           <FieldLabel icon={<Ruler size={18} />} title="Nozzle" />
           <input
             type="number"
